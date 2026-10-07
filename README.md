@@ -51,7 +51,9 @@ StarSavior 训练自动化是非官方桌面自动化工具，与《Star Savior�
 ```text
 .
 ├── main.py                  # 主入口
-├── ui_app.py                # 本地检查台：截图、决策、日志、事件与权重编辑
+├── ui_app.py                # 本地 WebUI 入口：截图、决策、日志、事件与权重编辑
+├── web_ui.py                # FastAPI 本地服务
+├── web/                     # WebUI 页面、样式和交互脚本
 ├── config.yaml              # 全局配置文件
 ├── src/
 │   ├── trainer.py           # 训练主循环、Handler 链调度
@@ -84,7 +86,7 @@ StarSavior 训练自动化是非官方桌面自动化工具，与《Star Savior�
 ### 1. 安装依赖
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-runtime.txt
 ```
 
 ### 2. 配置文件
@@ -117,13 +119,13 @@ python main.py
 python ui_app.py
 ```
 
-检查台不会连接游戏窗口，也不会发送输入。它读取 `logs/` 中的运行日志、
-本地 PNG 截图、`profiles/events/document_verified.json` 和 `config.yaml`，
-按“运行 / 事件库 / 配置”分 Tab 展示运行摘要、历史决策、日志、事件分支和
-量化收益，并允许结构化修改事件分支和训练/事件决策权重。脚本会把产生决策的
-游戏画面保存到 `logs/screenshots/`；在“运行”Tab 点击历史决策即可回看对应截图。
-旧日志没有截图关联时会明确显示为不可用。修改后分别点击“保存事件”或“保存权重”；
-下一次脚本启动时读取这些文件。
+检查台不会连接游戏窗口，也不会发送输入。它会在本机 `127.0.0.1:8765` 启动 WebUI，
+读取 `logs/` 中的运行日志、本地 PNG 截图、`profiles/events/document_verified.json`
+和 `config.yaml`，按“运行 / 事件库 / 配置”展示运行摘要、历史决策、日志、事件分支
+和量化收益，并允许结构化修改事件分支和训练/事件决策权重。脚本会把产生决策的游戏
+画面保存到 `logs/screenshots/`；在“运行”页点击历史决策即可回看对应截图。旧日志没有
+截图关联时会明确显示为不可用。修改后分别点击“保存事件”或“保存配置”；下一次脚本
+启动时读取这些文件。
 
 ## Handler 优先级链
 

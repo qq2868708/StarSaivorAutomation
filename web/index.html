@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StarSavior 自动化检查台</title>
+  <link rel="stylesheet" href="/assets/styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">S</div>
+        <div>
+          <strong>StarSavior</strong>
+          <span>Automation Desk</span>
+        </div>
+      </div>
+
+      <nav class="nav-list" aria-label="主导航">
+        <button class="nav-item active" data-tab="run"><span class="nav-icon">◉</span>运行</button>
+        <button class="nav-item" data-tab="events"><span class="nav-icon">◇</span>事件库</button>
+        <button class="nav-item" data-tab="config"><span class="nav-icon">⚙</span>配置</button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <span class="status-dot" id="healthDot"></span>
+        <div>
+          <strong>本地模式</strong>
+          <small>只读游戏画面，不发送输入</small>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">LOCAL CONTROL ROOM</p>
+          <h1 id="pageTitle">运行</h1>
+          <p class="page-subtitle" id="pageSubtitle">查看决策轨迹、点击目标和对应截图</p>
+        </div>
+        <div class="top-actions">
+          <span class="updated-label" id="updatedLabel">尚未刷新</span>
+          <button class="button secondary" id="refreshBtn">↻ 刷新数据</button>
+        </div>
+      </header>
+
+      <div class="toast" id="toast" role="status"></div>
+
+      <section class="tab-page active" id="tab-run">
+        <div class="metric-grid">
+          <article class="metric-card accent-purple">
+            <span class="metric-label">最近运行</span>
+            <strong class="metric-value" id="metric-run">—</strong>
+            <span class="metric-hint" id="metric-exit">等待日志</span>
+          </article>
+          <article class="metric-card accent-blue">
+            <span class="metric-label">记录动作</span>
+            <strong class="metric-value" id="metric-actions">—</strong>
+            <span class="metric-hint">当前运行汇总</span>
+          </article>
+          <article class="metric-card accent-green">
+            <span class="metric-label">训练次数</span>
+            <strong class="metric-value" id="metric-training">—</strong>
+            <span class="metric-hint">已写入日志</span>
+          </article>
+          <article class="metric-card accent-orange">
+            <span class="metric-label">事件次数</span>
+            <strong class="metric-value" id="metric-events">—</strong>
+            <span class="metric-hint">已处理事件</span>
+          </article>
+        </div>
+
+        <div class="run-grid">
+          <article class="panel decision-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>历史决策</h2>
+                <p>点击一行查看做出决策时的截图</p>
+              </div>
+              <span class="count-pill" id="decisionCount">0</span>
+            </div>
+            <div class="table-wrap decision-table-wrap">
+              <table class="data-table">
+                <thead><tr><th>时间</th><th>类型</th><th>决策</th><th>点击目标</th><th>截图</th></tr></thead>
+                <tbody id="decisionRows"><tr><td colspan="5" class="empty-cell">正在加载…</td></tr></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel screenshot-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>决策时截图</h2>
+                <p id="screenshotCaption">从左侧选择历史记录</p>
+              </div>
+              <span class="image-badge" id="screenshotBadge">未选择</span>
+            </div>
+            <div class="screenshot-stage" id="screenshotStage">
+              <div class="screenshot-placeholder" id="screenshotPlaceholder">
+                <div class="placeholder-icon">▧</div>
+                <strong>暂无截图预览</strong>
+                <span>新的运行会自动保存决策截图</span>
+              </div>
+              <img id="decisionImage" alt="决策时游戏截图" hidden>
+            </div>
+            <div class="screenshot-path" id="screenshotPath">—</div>
+          </article>
+        </div>
+
+        <div class="run-lower-grid">
+          <article class="panel log-panel">
+            <div class="panel-heading compact-heading">
+              <div><h2>运行日志</h2><p>最近运行的动作流水</p></div>
+              <button class="text-button" id="copyLogBtn">复制摘要</button>
+            </div>
+            <pre class="log-view" id="logView">正在加载…</pre>
+          </article>
+          <article class="panel run-list-panel">
+            <div class="panel-heading compact-heading">
+              <div><h2>运行记录</h2><p>最近保存的日志文件</p></div>
+            </div>
+            <div class="run-list" id="runList"><div class="empty-cell">暂无运行记录</div></div>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab-page" id="tab-events">
+        <div class="page-toolbar">
+          <div><h2>事件库</h2><p>浏览所有事件、分支和量化收益</p></div>
+          <div class="toolbar-controls">
+            <label class="search-box"><span>⌕</span><input id="eventSearch" placeholder="搜索事件名、类别或来源"></label>
+            <span class="count-pill" id="eventCount">0 / 0</span>
+          </div>
+        </div>
+        <div class="events-layout">
+          <article class="panel event-index-panel">
+            <div class="table-wrap">
+              <table class="data-table event-table">
+                <thead><tr><th>事件</th><th>类别</th><th>来源</th><th>状态</th><th>推荐</th><th>分支</th></tr></thead>
+                <tbody id="eventRows"><tr><td colspan="6" class="empty-cell">正在加载…</td></tr></tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="panel event-editor-panel">
+            <div class="panel-heading">
+              <div><h2>结构化编辑</h2><p id="eventEditorHint">选择事件后编辑推荐分支和收益文本</p></div>
+              <span class="image-badge" id="eventSourceBadge">未选择</span>
+            </div>
+            <div id="eventEmpty" class="editor-empty">从左侧选择一个事件开始编辑</div>
+            <div id="eventEditor" hidden>
+              <div class="form-grid event-meta-form">
+                <label>事件名<input id="eventName"></label>
+                <label>推荐分支<input id="eventRecommended" type="number" min="1"></label>
+              </div>
+              <div class="branch-heading"><h3>事件分支</h3><span>量化结果由收益原文自动整理</span></div>
+              <div class="table-wrap branch-table-wrap">
+                <table class="data-table branch-table">
+                  <thead><tr><th>序号</th><th>关键词</th><th>收益原文</th><th>量化收益</th></tr></thead>
+                  <tbody id="branchRows"></tbody>
+                </table>
+              </div>
+              <div class="branch-form">
+                <div class="form-grid">
+                  <label>序号<input id="branchIndex" type="number" min="1"></label>
+                  <label>关键词<input id="branchKeyword"></label>
+                </div>
+                <label>别名（逗号分隔）<input id="branchAlias"></label>
+                <label>收益原文<textarea id="branchEffect" rows="3"></textarea></label>
+                <div class="editor-actions">
+                  <button class="button secondary" id="updateBranchBtn">更新分支</button>
+                  <button class="button ghost" id="addBranchBtn">新增分支</button>
+                  <button class="button danger ghost" id="deleteBranchBtn">删除分支</button>
+                  <button class="button primary" id="saveEventBtn">保存事件</button>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="tab-page" id="tab-config">
+        <div class="page-toolbar">
+          <div><h2>决策配置</h2><p>调整后保存，下一次脚本运行时生效</p></div>
+          <button class="button primary" id="saveConfigBtn">保存配置</button>
+        </div>
+        <div class="config-grid" id="configGrid"><div class="empty-cell">正在加载…</div></div>
+      </section>
+    </main>
+  </div>
+  <script src="/assets/app.js"></script>
+</body>
+</html>
