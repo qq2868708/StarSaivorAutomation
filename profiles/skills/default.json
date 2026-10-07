@@ -1,0 +1,18 @@
+{
+  "_comment": "默认技能选择配置 - 通用",
+  "direction": "default",
+  "skills": [
+    {"name": "集中力", "priority": 9, "keywords": ["集中力", "集中"]},
+    {"name": "末脚", "priority": 8, "keywords": ["末脚", "最终冲刺", "末"]},
+    {"name": "全身全霊", "priority": 7, "keywords": ["全身全霊", "全身全灵", "全身"]},
+    {"name": "逃げ上手", "priority": 7, "keywords": ["逃げ上手", "逃脱高手", "逃げ"]},
+    {"name": "コーナー回復", "priority": 7, "keywords": ["弯道回复", "弯道恢复", "コーナー回復"]},
+    {"name": "直線回復", "priority": 7, "keywords": ["直线回复", "直线恢复", "直線回復"]},
+    {"name": "先駆け", "priority": 6, "keywords": ["先駆け", "先驱", "先駆"]},
+    {"name": "怪力", "priority": 6, "keywords": ["怪力", "怪力无双"]},
+    {"name": "円弧のマエストロ", "priority": 6, "keywords": ["圆弧大师", "円弧", "圆弧"]},
+    {"name": "コーナー加速", "priority": 5, "keywords": ["弯道加速", "コーナー加速", "弯道"]},
+    {"name": "直線加速", "priority": 5, "keywords": ["直线加速", "直線加速", "直线"]},
+    {"name": "ハイペース", "priority": 5, "keywords": ["快节奏", "ハイペース", "快"]}
+  ]
+}

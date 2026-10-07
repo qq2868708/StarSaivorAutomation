@@ -1,0 +1,26 @@
+{
+  "state": {
+    "stamina": {"x": 80, "y": 20, "w": 120, "h": 30},
+    "stamina_desc": "体力值显示区域，通常是百分比数字如 80%",
+    "mood": {"x": 220, "y": 20, "w": 80, "h": 30},
+    "mood_desc": "心情显示区域，英文单词: Worst/Bad/Normal/Good/Best",
+    "money": {"x": 350, "y": 20, "w": 100, "h": 30},
+    "money_desc": "金钱显示区域，数字如 120"
+  },
+  "options": [
+    {"attr_id": 1, "x": 520, "y": 300, "w": 280, "h": 60},
+    {"attr_id": 2, "x": 520, "y": 370, "w": 280, "h": 60},
+    {"attr_id": 3, "x": 520, "y": 440, "w": 280, "h": 60},
+    {"attr_id": 4, "x": 520, "y": 510, "w": 280, "h": 60},
+    {"attr_id": 5, "x": 520, "y": 580, "w": 280, "h": 60}
+  ],
+  "rest_options": [
+    {"rest_id": 1, "x": 100, "y": 650, "w": 200, "h": 50},
+    {"rest_id": 2, "x": 330, "y": 650, "w": 200, "h": 50},
+    {"rest_id": 3, "x": 560, "y": 650, "w": 200, "h": 50}
+  ],
+  "confirm_button": "confirm",
+  "next_button": "next",
+  "rest_button": "rest_button",
+  "rest_button_desc": "休息入口按钮模板名，点击后显示3种休息选项"
+}

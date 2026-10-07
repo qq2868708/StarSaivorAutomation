@@ -1,0 +1,79 @@
+{
+  "_comment": "速通策略：失败率>=100强制休息, 优先属性增益>=100冒险训练, 否则失败率>=30休息",
+  "legacy_strategy": {
+    "build_direction": "attack",
+    "fail_rate_threshold": 30,
+    "rush_threshold": 350
+  },
+  "rules": [
+    {
+      "id": "rest_extreme_fail",
+      "field": "any_fail_rate",
+      "operator": ">=",
+      "value": 100,
+      "action": "rest",
+      "enabled": true
+    },
+    {
+      "id": "adventure_any_gain",
+      "field": "any_gain",
+      "operator": ">=",
+      "value": 100,
+      "action": "train_best_gain",
+      "enabled": true
+    },
+    {
+      "id": "rest_normal_fail",
+      "field": "any_fail_rate",
+      "operator": ">=",
+      "value": 30,
+      "action": "rest",
+      "enabled": true
+    },
+    {
+      "id": "strength_icons_3",
+      "field": "strength_icons",
+      "operator": ">=",
+      "value": 3,
+      "action": "train_strength",
+      "enabled": true
+    },
+    {
+      "id": "stamina_icons_3",
+      "field": "stamina_icons",
+      "operator": ">=",
+      "value": 3,
+      "action": "train_stamina",
+      "enabled": true
+    },
+    {
+      "id": "agility_icons_3",
+      "field": "agility_icons",
+      "operator": ">=",
+      "value": 3,
+      "action": "train_agility",
+      "enabled": true
+    },
+    {
+      "id": "focus_icons_3",
+      "field": "focus_icons",
+      "operator": ">=",
+      "value": 3,
+      "action": "train_focus",
+      "enabled": true
+    },
+    {
+      "id": "guard_icons_3",
+      "field": "guard_icons",
+      "operator": ">=",
+      "value": 3,
+      "action": "train_guard",
+      "enabled": true
+    },
+    {
+      "id": "fallback_attack_strength",
+      "action": "train_strength",
+      "enabled": true
+    }
+  ]
+}

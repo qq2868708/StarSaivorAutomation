@@ -1,0 +1,3344 @@
+{
+  "_comment": "商店物品配置 - 遇到未知物品时自动添加。手动编辑以调整优先级。",
+  "items": [
+    {
+      "id": "shop_1707afc0",
+      "name": "早鸟",
+      "type": "consumable",
+      "keywords": [
+        "早鸟",
+        "早鸟"
+      ],
+      "attr_name": "早鸟",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_044fef3c",
+      "name": "永不从战斗中撤退",
+      "type": "consumable",
+      "keywords": [
+        "永不从战斗中撤退",
+        "永不从战斗中撤退"
+      ],
+      "attr_name": "永不从战斗中撤退",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_94dfaff8",
+      "name": "装饰玻璃剑",
+      "type": "consumable",
+      "keywords": [
+        "装饰玻璃剑",
+        "装饰玻璃剑"
+      ],
+      "attr_name": "装饰玻璃剑",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_3913755f",
+      "name": "舞动的锯片",
+      "type": "consumable",
+      "keywords": [
+        "舞动的锯片",
+        "舞动的锯片"
+      ],
+      "attr_name": "舞动的锯片",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_aece745b",
+      "name": "Cafe Strega优惠券",
+      "type": "consumable",
+      "keywords": [
+        "Cafe Strega优惠券",
+        "CafeStrega优惠券"
+      ],
+      "attr_name": "Cafe Strega优惠券",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_1eabbbd4",
+      "name": "特辑海报",
+      "type": "consumable",
+      "keywords": [
+        "特辑海报",
+        "特辑海报"
+      ],
+      "attr_name": "特辑海报",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_25fd4a70",
+      "name": "便携式风扇",
+      "type": "consumable",
+      "keywords": [
+        "便携式风扇",
+        "便携式风扇"
+      ],
+      "attr_name": "便携式风扇",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_0673a958",
+      "name": "洞察力奖章",
+      "type": "consumable",
+      "keywords": [
+        "洞察力奖章",
+        "洞察力奖章"
+      ],
+      "attr_name": "洞察力奖章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_256c9053",
+      "name": "力量奖章",
+      "type": "consumable",
+      "keywords": [
+        "力量奖章",
+        "力量奖章"
+      ],
+      "attr_name": "力量奖章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_96f19fd5",
+      "name": "技能奖章",
+      "type": "consumable",
+      "keywords": [
+        "技能奖章",
+        "技能奖章"
+      ],
+      "attr_name": "技能奖章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_c80e3e38",
+      "name": "月光润唇膏小样",
+      "type": "consumable",
+      "keywords": [
+        "月光润唇膏小样",
+        "月光润唇膏小样"
+      ],
+      "attr_name": "月光润唇膏小样",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_c4f33878",
+      "name": "月光精华样品",
+      "type": "consumable",
+      "keywords": [
+        "月光精华样品",
+        "月光精华样品"
+      ],
+      "attr_name": "月光精华样品",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_1d18685a",
+      "name": "月光香水小样",
+      "type": "consumable",
+      "keywords": [
+        "月光香水小样",
+        "月光香水小样"
+      ],
+      "attr_name": "月光香水小样",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_fce4feef",
+      "name": "街头烘焙食品",
+      "type": "consumable",
+      "keywords": [
+        "街头烘焙食品",
+        "街头烘焙食品"
+      ],
+      "attr_name": "街头烘焙食品",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_3512c97e",
+      "name": "英勇勋章",
+      "type": "consumable",
+      "keywords": [
+        "英勇勋章",
+        "英勇勋章"
+      ],
+      "attr_name": "英勇勋章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_6239703c",
+      "name": "来历不明的遗物",
+      "type": "consumable",
+      "keywords": [
+        "来历不明的遗物",
+        "来历不明的遗物"
+      ],
+      "attr_name": "来历不明的遗物",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_3c9cc9fe",
+      "name": "智慧勋章",
+      "type": "consumable",
+      "keywords": [
+        "智慧勋章",
+        "智慧勋章"
+      ],
+      "attr_name": "智慧勋章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_b403a078",
+      "name": "宁静勋章",
+      "type": "consumable",
+      "keywords": [
+        "宁静勋章",
+        "宁静勋章"
+      ],
+      "attr_name": "宁静勋章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_1442e8b2",
+      "name": "皇家肉炸组",
+      "type": "consumable",
+      "keywords": [
+        "皇家肉炸组",
+        "皇家肉炸组"
+      ],
+      "attr_name": "皇家肉炸组",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_9ff197d3",
+      "name": "皇家水果沙拉组",
+      "type": "consumable",
+      "keywords": [
+        "皇家水果沙拉组",
+        "皇家水果沙拉组"
+      ],
+      "attr_name": "皇家水果沙拉组",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_d5127efb",
+      "name": "皇家牛肉意面组",
+      "type": "consumable",
+      "keywords": [
+        "皇家牛肉意面组",
+        "皇家牛肉意面组"
+      ],
+      "attr_name": "皇家牛肉意面组",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_6f841646",
+      "name": "皇家炸蔬菜组",
+      "type": "attribute_boost",
+      "keywords": [
+        "皇家炸蔬菜组",
+        "皇家炸蔬菜",
+        "炸蔬菜组"
+      ],
+      "name_keys": [
+        "皇家炸蔬菜组",
+        "皇家炸蔬菜",
+        "炸蔬菜组"
+      ],
+      "effect_keys": [
+        "专注",
+        "保护"
+      ],
+      "attr_name": "保护/专注",
+      "value": 16,
+      "sub_type": "attribute",
+      "priority": null,
+      "note": "专注+保护各16点, 归入保护/专注→属性类。sub_type: attribute=属性类(直接加值), stat=数值类(百分比)"
+    },
+    {
+      "id": "shop_3cd463d8",
+      "name": "皇家奶油意面组",
+      "type": "consumable",
+      "keywords": [
+        "皇家奶油意面组",
+        "皇家奶油意面组"
+      ],
+      "attr_name": "皇家奶油意面组",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_58f332c7",
+      "name": "女巫汤",
+      "type": "consumable",
+      "keywords": [
+        "女巫汤",
+        "女巫汤"
+      ],
+      "attr_name": "女巫汤",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_149a4c2e",
+      "name": "奇迹柑橘",
+      "type": "status_buff",
+      "keywords": [
+        "奇迹柑橘",
+        "柑橘"
+      ],
+      "name_keys": [
+        "奇迹柑橘",
+        "柑橘"
+      ],
+      "effect_keys": [
+        "保护",
+        "训练加成",
+        "加成"
+      ],
+      "attr_name": "保护",
+      "value": 0,
+      "priority": null,
+      "note": "保护训练加成物品 (类似心情buff, 进行保护训练时额外获得属性)"
+    },
+    {
+      "id": "shop_4cce769a",
+      "name": "能量饮料",
+      "type": "consumable",
+      "keywords": [
+        "能量饮料",
+        "能量饮料"
+      ],
+      "attr_name": "能量饮料",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_ec3ba1af",
+      "name": "特制橙汁",
+      "type": "consumable",
+      "keywords": [
+        "特制橙汁",
+        "特制橙汁"
+      ],
+      "attr_name": "特制橙汁",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_84fc4867",
+      "name": "特制章鱼烧",
+      "type": "consumable",
+      "keywords": [
+        "特制章鱼烧",
+        "特制章鱼烧"
+      ],
+      "attr_name": "特制章鱼烧",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_793c63ec",
+      "name": "特制芭菲",
+      "type": "consumable",
+      "keywords": [
+        "特制芭菲",
+        "特制芭菲"
+      ],
+      "attr_name": "特制芭菲",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_1a920f0d",
+      "name": "南瓜之夜",
+      "type": "consumable",
+      "keywords": [
+        "南瓜之夜",
+        "南瓜之夜"
+      ],
+      "attr_name": "南瓜之夜",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_2651d5c8",
+      "name": "优质炸肉",
+      "type": "consumable",
+      "keywords": [
+        "优质炸肉",
+        "优质炸肉"
+      ],
+      "attr_name": "优质炸肉",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_a43f4b1b",
+      "name": "美味水果沙拉",
+      "type": "consumable",
+      "keywords": [
+        "美味水果沙拉",
+        "美味水果沙拉"
+      ],
+      "attr_name": "美味水果沙拉",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_3917c7cf",
+      "name": "优质牛肉意面",
+      "type": "consumable",
+      "keywords": [
+        "优质牛肉意面",
+        "优质牛肉意面"
+      ],
+      "attr_name": "优质牛肉意面",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_d9657584",
+      "name": "美味蔬菜沙拉",
+      "type": "consumable",
+      "keywords": [
+        "美味蔬菜沙拉",
+        "美味蔬菜沙拉"
+      ],
+      "attr_name": "美味蔬菜沙拉",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_bbc7adc6",
+      "name": "高级蔬菜天妇罗",
+      "type": "consumable",
+      "keywords": [
+        "高级蔬菜天妇罗",
+        "高级蔬菜天妇罗"
+      ],
+      "attr_name": "高级蔬菜天妇罗",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_9ba7f45a",
+      "name": "高级奶油意面",
+      "type": "consumable",
+      "keywords": [
+        "高级奶油意面",
+        "高级奶油意面"
+      ],
+      "attr_name": "高级奶油意面",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_e77fb204",
+      "name": "街头小贩邦吉奥邦",
+      "type": "consumable",
+      "keywords": [
+        "街头小贩邦吉奥邦",
+        "街头小贩邦吉奥邦"
+      ],
+      "attr_name": "街头小贩邦吉奥邦",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_92dc68b0",
+      "name": "街头冰淇淋",
+      "type": "consumable",
+      "keywords": [
+        "街头冰淇淋",
+        "街头冰淇淋"
+      ],
+      "attr_name": "街头冰淇淋",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_a5e5fae1",
+      "name": "甜甜圈",
+      "type": "consumable",
+      "keywords": [
+        "甜甜圈",
+        "甜甜圈"
+      ],
+      "attr_name": "甜甜圈",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_d32c54da",
+      "name": "早晨的咖啡",
+      "type": "consumable",
+      "keywords": [
+        "早晨的咖啡",
+        "早晨的咖啡"
+      ],
+      "attr_name": "早晨的咖啡",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_cf8683b8",
+      "name": "鲜牛奶",
+      "type": "consumable",
+      "keywords": [
+        "鲜牛奶",
+        "鲜牛奶"
+      ],
+      "attr_name": "鲜牛奶",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_051aaaf2",
+      "name": "深渊炸鱼",
+      "type": "consumable",
+      "keywords": [
+        "深渊炸鱼",
+        "深渊炸鱼"
+      ],
+      "attr_name": "深渊炸鱼",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_ef1a73f7",
+      "name": "综合营养补充剂",
+      "type": "consumable",
+      "keywords": [
+        "综合营养补充剂",
+        "综合营养补充剂"
+      ],
+      "attr_name": "综合营养补充剂",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_23f77bff",
+      "name": "草莓",
+      "type": "consumable",
+      "keywords": [
+        "草莓",
+        "草莓"
+      ],
+      "attr_name": "草莓",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_a8c0dfd8",
+      "name": "苹果",
+      "type": "consumable",
+      "keywords": [
+        "苹果",
+        "苹果"
+      ],
+      "attr_name": "苹果",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_0415692e",
+      "name": "探险家肉炖菜",
+      "type": "consumable",
+      "keywords": [
+        "探险家肉炖菜",
+        "探险家肉炖菜"
+      ],
+      "attr_name": "探险家肉炖菜",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_12bfdef3",
+      "name": "探险家蔬菜炖菜",
+      "type": "consumable",
+      "keywords": [
+        "探险家蔬菜炖菜",
+        "探险家蔬菜炖菜"
+      ],
+      "attr_name": "探险家蔬菜炖菜",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_6a69264d",
+      "name": "莫里安特色饼干",
+      "type": "consumable",
+      "keywords": [
+        "莫里安特色饼干",
+        "莫里安特色饼干"
+      ],
+      "attr_name": "莫里安特色饼干",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_e3e091bd",
+      "name": "特制蜂蜜糖",
+      "type": "consumable",
+      "keywords": [
+        "特制蜂蜜糖",
+        "特制蜂蜜糖"
+      ],
+      "attr_name": "特制蜂蜜糖",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_14bcc89a",
+      "name": "蓬松蛋糕",
+      "type": "consumable",
+      "keywords": [
+        "蓬松蛋糕",
+        "蓬松蛋糕"
+      ],
+      "attr_name": "蓬松蛋糕",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_3a20a85d",
+      "name": "弗洛拉西瓜",
+      "type": "consumable",
+      "keywords": [
+        "弗洛拉西瓜",
+        "弗洛拉西瓜"
+      ],
+      "attr_name": "弗洛拉西瓜",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_c88e8126",
+      "name": "弗洛拉橙",
+      "type": "consumable",
+      "keywords": [
+        "弗洛拉橙",
+        "弗洛拉橙"
+      ],
+      "attr_name": "弗洛拉橙",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_283bb518",
+      "name": "炸肉",
+      "type": "consumable",
+      "keywords": [
+        "炸肉",
+        "炸肉"
+      ],
+      "attr_name": "炸肉",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_7e11c608",
+      "name": "水果沙拉",
+      "type": "consumable",
+      "keywords": [
+        "水果沙拉",
+        "水果沙拉"
+      ],
+      "attr_name": "水果沙拉",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_71bc0984",
+      "name": "牛排",
+      "type": "consumable",
+      "keywords": [
+        "牛排",
+        "牛排"
+      ],
+      "attr_name": "牛排",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_1325bec6",
+      "name": "牛肉意面",
+      "type": "consumable",
+      "keywords": [
+        "牛肉意面",
+        "牛肉意面"
+      ],
+      "attr_name": "牛肉意面",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_ac4da30c",
+      "name": "蔬菜沙拉",
+      "type": "consumable",
+      "keywords": [
+        "蔬菜沙拉",
+        "蔬菜沙拉"
+      ],
+      "attr_name": "蔬菜沙拉",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_5799a9b8",
+      "name": "蔬菜天妇罗",
+      "type": "consumable",
+      "keywords": [
+        "蔬菜天妇罗",
+        "蔬菜天妇罗"
+      ],
+      "attr_name": "蔬菜天妇罗",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_3b689c93",
+      "name": "鸡排",
+      "type": "attribute_boost",
+      "keywords": [
+        "鸡排"
+      ],
+      "name_keys": [
+        "鸡排"
+      ],
+      "effect_keys": [
+        "韧性"
+      ],
+      "attr_name": "韧性",
+      "value": 5,
+      "priority": null,
+      "note": "韧性属性增加物品"
+    },
+    {
+      "id": "shop_e332dafe",
+      "name": "奶油意面",
+      "type": "consumable",
+      "keywords": [
+        "奶油意面",
+        "奶油意面"
+      ],
+      "attr_name": "奶油意面",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_61bf1ee3",
+      "name": "普通甜甜圈",
+      "type": "consumable",
+      "keywords": [
+        "普通甜甜圈",
+        "普通甜甜圈"
+      ],
+      "attr_name": "普通甜甜圈",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_90fe0c31",
+      "name": "纯牛奶",
+      "type": "consumable",
+      "keywords": [
+        "纯牛奶",
+        "纯牛奶"
+      ],
+      "attr_name": "纯牛奶",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_98afadfb",
+      "name": "普通蛋糕",
+      "type": "potential_points",
+      "keywords": [
+        "普通蛋糕",
+        "普通蛋糕",
+        "70“'ey7、丆船／/对 普通蛋糕 料理食物0 潜质点数10增"
+      ],
+      "attr_name": "潜质点数",
+      "value": 0,
+      "priority": null,
+      "note": "Upgraded 2026-05-26 20:20:45. Raw: 70“'ey7、丆船／/对 普通蛋糕 料理食物0 潜质点数10增",
+      "name_keys": [
+        "普通蛋糕",
+        "普通蛋糕",
+        "70“'ey7、丆船／/对 普通蛋糕 料理食物0 潜质点数10增"
+      ],
+      "effect_keys": [
+        "潜质点数"
+      ]
+    },
+    {
+      "id": "shop_a702da42",
+      "name": "禁忌保护训练之书",
+      "type": "training_exp",
+      "keywords": [
+        "禁忌保护训练之书",
+        "禁忌保护训练之书"
+      ],
+      "attr_name": "保护",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "禁忌保护训练之书",
+        "禁忌保护训练之书"
+      ],
+      "effect_keys": [
+        "保护",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_37e3ec0c",
+      "name": "禁忌忍耐训练之书",
+      "type": "training_exp",
+      "keywords": [
+        "禁忌忍耐训练之书",
+        "禁忌忍耐训练之书"
+      ],
+      "attr_name": "忍耐",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "禁忌忍耐训练之书",
+        "禁忌忍耐训练之书"
+      ],
+      "effect_keys": [
+        "忍耐",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_9a1f034d",
+      "name": "禁忌集中训练之书",
+      "type": "training_exp",
+      "keywords": [
+        "禁忌集中训练之书",
+        "禁忌集中训练之书"
+      ],
+      "attr_name": "集中",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "禁忌集中训练之书",
+        "禁忌集中训练之书"
+      ],
+      "effect_keys": [
+        "集中",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_0c52bee6",
+      "name": "禁忌体力训练之书",
+      "type": "training_exp",
+      "keywords": [
+        "禁忌体力训练之书",
+        "禁忌体力训练之书"
+      ],
+      "attr_name": "体力",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "禁忌体力训练之书",
+        "禁忌体力训练之书"
+      ],
+      "effect_keys": [
+        "体力",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_655b968d",
+      "name": "禁忌力量训练之书",
+      "type": "training_exp",
+      "keywords": [
+        "禁忌力量训练之书",
+        "禁忌力量训练之书"
+      ],
+      "attr_name": "力量",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "禁忌力量训练之书",
+        "禁忌力量训练之书"
+      ],
+      "effect_keys": [
+        "力量",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_7dd63a02",
+      "name": "保护训练的秘笈",
+      "type": "training_exp",
+      "keywords": [
+        "保护训练的秘笈",
+        "保护训练的秘笈"
+      ],
+      "attr_name": "保护",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "保护训练的秘笈",
+        "保护训练的秘笈"
+      ],
+      "effect_keys": [
+        "保护",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_e4da9826",
+      "name": "忍耐训练的秘笈",
+      "type": "training_exp",
+      "keywords": [
+        "忍耐训练的秘笈",
+        "忍耐训练的秘笈"
+      ],
+      "attr_name": "忍耐",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "忍耐训练的秘笈",
+        "忍耐训练的秘笈"
+      ],
+      "effect_keys": [
+        "忍耐",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_152d064f",
+      "name": "集中训练的秘笈",
+      "type": "training_exp",
+      "keywords": [
+        "集中训练的秘笈",
+        "集中训练的秘笈"
+      ],
+      "attr_name": "集中",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "集中训练的秘笈",
+        "集中训练的秘笈"
+      ],
+      "effect_keys": [
+        "集中",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_97fc60b7",
+      "name": "体力训练的秘笈",
+      "type": "training_exp",
+      "keywords": [
+        "体力训练的秘笈",
+        "体力训练的秘笈"
+      ],
+      "attr_name": "体力",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "体力训练的秘笈",
+        "体力训练的秘笈"
+      ],
+      "effect_keys": [
+        "体力",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_9f55307f",
+      "name": "力量训练的秘笈",
+      "type": "training_exp",
+      "keywords": [
+        "力量训练的秘笈",
+        "力量训练的秘笈"
+      ],
+      "attr_name": "力量",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "力量训练的秘笈",
+        "力量训练的秘笈"
+      ],
+      "effect_keys": [
+        "力量",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_c80d72e4",
+      "name": "活力药水",
+      "type": "vitality_potion",
+      "keywords": [
+        "活力药水",
+        "活力",
+        "药水",
+        "活",
+        "力药",
+        "活力药",
+        "@效果 0弓在特定事件中使用"
+      ],
+      "name_keys": [
+        "活力药水",
+        "活力",
+        "药水",
+        "活",
+        "力药",
+        "活力药"
+      ],
+      "effect_keys": [
+        "特定事件中",
+        "活力"
+      ],
+      "attr_name": "活力",
+      "value": 0,
+      "priority": 0,
+      "note": "Upgraded 2026-05-26 21:20:37. Raw: 70“'ey7、丆船／/对 活力药水 贵重物品0 特定事件中使用"
+    },
+    {
+      "id": "shop_9e3522e7",
+      "name": "洛洛卡的包裹",
+      "type": "consumable",
+      "keywords": [
+        "洛洛卡的包裹",
+        "洛洛卡的包裹"
+      ],
+      "attr_name": "洛洛卡的包裹",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_819fd02c",
+      "name": "坚固的卡钳",
+      "type": "consumable",
+      "keywords": [
+        "坚固的卡钳",
+        "坚固的卡钳"
+      ],
+      "attr_name": "坚固的卡钳",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_c827397d",
+      "name": "专注的凝视",
+      "type": "consumable",
+      "keywords": [
+        "专注的凝视",
+        "专注的凝视"
+      ],
+      "attr_name": "专注的凝视",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_af3403f5",
+      "name": "压铸机车模型",
+      "type": "consumable",
+      "keywords": [
+        "压铸机车模型",
+        "压铸机车模型"
+      ],
+      "attr_name": "压铸机车模型",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_3a471ea3",
+      "name": "霓虹特工钥匙扣",
+      "type": "consumable",
+      "keywords": [
+        "霓虹特工钥匙扣",
+        "霓虹特工钥匙扣"
+      ],
+      "attr_name": "霓虹特工钥匙扣",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f971782a",
+      "name": "满溢的爱",
+      "type": "consumable",
+      "keywords": [
+        "满溢的爱",
+        "满溢的爱"
+      ],
+      "attr_name": "满溢的爱",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_7025c247",
+      "name": "佩特拉工具 Ver.00",
+      "type": "consumable",
+      "keywords": [
+        "佩特拉工具 Ver.00",
+        "佩特拉工具Ver00"
+      ],
+      "attr_name": "佩特拉工具 Ver.00",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_b26015ad",
+      "name": "蓝色蝴蝶",
+      "type": "consumable",
+      "keywords": [
+        "蓝色蝴蝶",
+        "蓝色蝴蝶"
+      ],
+      "attr_name": "蓝色蝴蝶",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_97e813a8",
+      "name": "幸运木制骰子套装",
+      "type": "consumable",
+      "keywords": [
+        "幸运木制骰子套装",
+        "幸运木制骰子套装"
+      ],
+      "attr_name": "幸运木制骰子套装",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_dd03a140",
+      "name": "K.I.杰出员工奖杯",
+      "type": "consumable",
+      "keywords": [
+        "K.I.杰出员工奖杯",
+        "KI杰出员工奖杯"
+      ],
+      "attr_name": "K.I.杰出员工奖杯",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_5a728b03",
+      "name": "狼之契约",
+      "type": "consumable",
+      "keywords": [
+        "狼之契约",
+        "狼之契约"
+      ],
+      "attr_name": "狼之契约",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_b7210aac",
+      "name": "逃亡者斗篷",
+      "type": "consumable",
+      "keywords": [
+        "逃亡者斗篷",
+        "逃亡者斗篷"
+      ],
+      "attr_name": "逃亡者斗篷",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_34352823",
+      "name": "有毒鳞片",
+      "type": "consumable",
+      "keywords": [
+        "有毒鳞片",
+        "有毒鳞片"
+      ],
+      "attr_name": "有毒鳞片",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_dd306d2e",
+      "name": "活字印剧",
+      "type": "consumable",
+      "keywords": [
+        "活字印剧",
+        "活字印剧"
+      ],
+      "attr_name": "活字印剧",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_ef538750",
+      "name": "火种玻璃瓶",
+      "type": "consumable",
+      "keywords": [
+        "火种玻璃瓶",
+        "火种玻璃瓶"
+      ],
+      "attr_name": "火种玻璃瓶",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_57b7e34a",
+      "name": "沙滩排球二等奖",
+      "type": "consumable",
+      "keywords": [
+        "沙滩排球二等奖",
+        "沙滩排球二等奖"
+      ],
+      "attr_name": "沙滩排球二等奖",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f9669ea9",
+      "name": "冰封吊坠",
+      "type": "consumable",
+      "keywords": [
+        "冰封吊坠",
+        "冰封吊坠"
+      ],
+      "attr_name": "冰封吊坠",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f0325534",
+      "name": "温泉纪念毛巾",
+      "type": "consumable",
+      "keywords": [
+        "温泉纪念毛巾",
+        "温泉纪念毛巾"
+      ],
+      "attr_name": "温泉纪念毛巾",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_4725690d",
+      "name": "危机逃脱玩具",
+      "type": "consumable",
+      "keywords": [
+        "危机逃脱玩具",
+        "危机逃脱玩具"
+      ],
+      "attr_name": "危机逃脱玩具",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_96178e89",
+      "name": "诅咒荆棘棒",
+      "type": "consumable",
+      "keywords": [
+        "诅咒荆棘棒",
+        "诅咒荆棘棒"
+      ],
+      "attr_name": "诅咒荆棘棒",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_0413804d",
+      "name": "被诅咒的香炉",
+      "type": "consumable",
+      "keywords": [
+        "被诅咒的香炉",
+        "被诅咒的香炉"
+      ],
+      "attr_name": "被诅咒的香炉",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_114dc2e0",
+      "name": "体能特训证书",
+      "type": "training_exp",
+      "keywords": [
+        "体能特训证书",
+        "体能特训证书"
+      ],
+      "attr_name": "体能",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "体能特训证书",
+        "体能特训证书"
+      ],
+      "effect_keys": [
+        "体能",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_6bfc171d",
+      "name": "体能训练结业奖牌",
+      "type": "training_exp",
+      "keywords": [
+        "体能训练结业奖牌",
+        "体能训练结业奖牌"
+      ],
+      "attr_name": "体能",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "体能训练结业奖牌",
+        "体能训练结业奖牌"
+      ],
+      "effect_keys": [
+        "体能",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_df0cd0ad",
+      "name": "智者之手",
+      "type": "consumable",
+      "keywords": [
+        "智者之手",
+        "智者之手"
+      ],
+      "attr_name": "智者之手",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_5373f5d0",
+      "name": "伤痕收割镰",
+      "type": "consumable",
+      "keywords": [
+        "伤痕收割镰",
+        "伤痕收割镰"
+      ],
+      "attr_name": "伤痕收割镰",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_8cba044e",
+      "name": "力量特训证书",
+      "type": "training_exp",
+      "keywords": [
+        "力量特训证书",
+        "力量特训证书"
+      ],
+      "attr_name": "力量",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "力量特训证书",
+        "力量特训证书"
+      ],
+      "effect_keys": [
+        "力量",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_c5ad47ad",
+      "name": "力量训练结业奖牌",
+      "type": "training_exp",
+      "keywords": [
+        "力量训练结业奖牌",
+        "力量训练结业奖牌"
+      ],
+      "attr_name": "力量",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55",
+      "name_keys": [
+        "力量训练结业奖牌",
+        "力量训练结业奖牌"
+      ],
+      "effect_keys": [
+        "力量",
+        "训练经验"
+      ]
+    },
+    {
+      "id": "shop_653a8bf8",
+      "name": "技艺之币",
+      "type": "consumable",
+      "keywords": [
+        "技艺之币",
+        "技艺之币"
+      ],
+      "attr_name": "技艺之币",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_7fd3cfa6",
+      "name": "领取预约单表A",
+      "type": "consumable",
+      "keywords": [
+        "领取预约单表A",
+        "领取预约单表A"
+      ],
+      "attr_name": "领取预约单表A",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_e8bcc9c3",
+      "name": "领取预约单表B",
+      "type": "consumable",
+      "keywords": [
+        "领取预约单表B",
+        "领取预约单表B"
+      ],
+      "attr_name": "领取预约单表B",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_4a9bcb6c",
+      "name": "迅捷之币",
+      "type": "consumable",
+      "keywords": [
+        "迅捷之币",
+        "迅捷之币"
+      ],
+      "attr_name": "迅捷之币",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_22377008",
+      "name": "古老沙漏",
+      "type": "consumable",
+      "keywords": [
+        "古老沙漏",
+        "古老沙漏"
+      ],
+      "attr_name": "古老沙漏",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_6c092a46",
+      "name": "英勇之币",
+      "type": "consumable",
+      "keywords": [
+        "英勇之币",
+        "英勇之币"
+      ],
+      "attr_name": "英勇之币",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_21c7cad5",
+      "name": "强盗男爵讨伐徽章",
+      "type": "consumable",
+      "keywords": [
+        "强盗男爵讨伐徽章",
+        "强盗男爵讨伐徽章"
+      ],
+      "attr_name": "强盗男爵讨伐徽章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_299f7216",
+      "name": "史莱姆讨伐徽章",
+      "type": "consumable",
+      "keywords": [
+        "史莱姆讨伐徽章",
+        "史莱姆讨伐徽章"
+      ],
+      "attr_name": "史莱姆讨伐徽章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_fc3c30dd",
+      "name": "银色功勋徽章",
+      "type": "consumable",
+      "keywords": [
+        "银色功勋徽章",
+        "银色功勋徽章"
+      ],
+      "attr_name": "银色功勋徽章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_8b7239df",
+      "name": "耐心之币",
+      "type": "consumable",
+      "keywords": [
+        "耐心之币",
+        "耐心之币"
+      ],
+      "attr_name": "耐心之币",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_541b820d",
+      "name": "人偶讨伐徽章",
+      "type": "consumable",
+      "keywords": [
+        "人偶讨伐徽章",
+        "人偶讨伐徽章"
+      ],
+      "attr_name": "人偶讨伐徽章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_e8804919",
+      "name": "传说之剑复制品",
+      "type": "consumable",
+      "keywords": [
+        "传说之剑复制品",
+        "传说之剑复制品"
+      ],
+      "attr_name": "传说之剑复制品",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_9a07eacd",
+      "name": "宁静之币",
+      "type": "consumable",
+      "keywords": [
+        "宁静之币",
+        "宁静之币"
+      ],
+      "attr_name": "宁静之币",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_4292b74a",
+      "name": "魔法瓶",
+      "type": "consumable",
+      "keywords": [
+        "魔法瓶",
+        "魔法瓶"
+      ],
+      "attr_name": "魔法瓶",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_c15be8f2",
+      "name": "灰烬王座",
+      "type": "consumable",
+      "keywords": [
+        "灰烬王座",
+        "灰烬王座"
+      ],
+      "attr_name": "灰烬王座",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_7224ac23",
+      "name": "平衡的天平",
+      "type": "consumable",
+      "keywords": [
+        "平衡的天平",
+        "平衡的天平"
+      ],
+      "attr_name": "平衡的天平",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f842c5bd",
+      "name": "蕾塞特的存钱罐",
+      "type": "consumable",
+      "keywords": [
+        "蕾塞特的存钱罐",
+        "蕾塞特的存钱罐"
+      ],
+      "attr_name": "蕾塞特的存钱罐",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_63825781",
+      "name": "星光功勋服务徽章",
+      "type": "consumable",
+      "keywords": [
+        "星光功勋服务徽章",
+        "星光功勋服务徽章"
+      ],
+      "attr_name": "星光功勋服务徽章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_4d6a2fad",
+      "name": "沙滩排球锦标奖杯",
+      "type": "consumable",
+      "keywords": [
+        "沙滩排球锦标奖杯",
+        "沙滩排球锦标奖杯"
+      ],
+      "attr_name": "沙滩排球锦标奖杯",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f24aec49",
+      "name": "红舞鞋",
+      "type": "consumable",
+      "keywords": [
+        "红舞鞋",
+        "红舞鞋"
+      ],
+      "attr_name": "红舞鞋",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_8a863dae",
+      "name": "老式猎人步枪",
+      "type": "consumable",
+      "keywords": [
+        "老式猎人步枪",
+        "老式猎人步枪"
+      ],
+      "attr_name": "老式猎人步枪",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_9c27b8ef",
+      "name": "烦人的布谷鸟钟",
+      "type": "consumable",
+      "keywords": [
+        "烦人的布谷鸟钟",
+        "烦人的布谷鸟钟"
+      ],
+      "attr_name": "烦人的布谷鸟钟",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_4d82376e",
+      "name": "街头面包店Ⅲ",
+      "type": "consumable",
+      "keywords": [
+        "街头面包店Ⅲ",
+        "街头面包店Ⅲ"
+      ],
+      "attr_name": "街头面包店Ⅲ",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_ee2bc884",
+      "name": "蘸墨笔系列",
+      "type": "consumable",
+      "keywords": [
+        "蘸墨笔系列",
+        "蘸墨笔系列"
+      ],
+      "attr_name": "蘸墨笔系列",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_68fc4f9f",
+      "name": "永久旋转装置",
+      "type": "consumable",
+      "keywords": [
+        "永久旋转装置",
+        "永久旋转装置"
+      ],
+      "attr_name": "永久旋转装置",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_e784b909",
+      "name": "毛绒绒的朋友",
+      "type": "consumable",
+      "keywords": [
+        "毛绒绒的朋友",
+        "毛绒绒的朋友"
+      ],
+      "attr_name": "毛绒绒的朋友",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f123103c",
+      "name": "钢铁之花",
+      "type": "consumable",
+      "keywords": [
+        "钢铁之花",
+        "钢铁之花"
+      ],
+      "attr_name": "钢铁之花",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_d2577eb7",
+      "name": "坚毅决斗手套",
+      "type": "consumable",
+      "keywords": [
+        "坚毅决斗手套",
+        "坚毅决斗手套"
+      ],
+      "attr_name": "坚毅决斗手套",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_3973dc07",
+      "name": "用于安全目的的自动装置",
+      "type": "consumable",
+      "keywords": [
+        "用于安全目的的自动装置",
+        "用于安全目的的自动装置"
+      ],
+      "attr_name": "用于安全目的的自动装置",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_18710588",
+      "name": "古董钥匙",
+      "type": "consumable",
+      "keywords": [
+        "古董钥匙",
+        "古董钥匙"
+      ],
+      "attr_name": "古董钥匙",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_52ad3eb3",
+      "name": "观赏性吸血植物",
+      "type": "consumable",
+      "keywords": [
+        "观赏性吸血植物",
+        "观赏性吸血植物"
+      ],
+      "attr_name": "观赏性吸血植物",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_12ea3fb6",
+      "name": "饥饿小丑面具",
+      "type": "consumable",
+      "keywords": [
+        "饥饿小丑面具",
+        "饥饿小丑面具"
+      ],
+      "attr_name": "饥饿小丑面具",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f7080e62",
+      "name": "金质功绩奖章",
+      "type": "consumable",
+      "keywords": [
+        "金质功绩奖章",
+        "金质功绩奖章"
+      ],
+      "attr_name": "金质功绩奖章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_1d870712",
+      "name": "骑士的荣誉",
+      "type": "consumable",
+      "keywords": [
+        "骑士的荣誉",
+        "骑士的荣誉"
+      ],
+      "attr_name": "骑士的荣誉",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_6dcc8c3f",
+      "name": "骑士的荣耀",
+      "type": "consumable",
+      "keywords": [
+        "骑士的荣耀",
+        "骑士的荣耀"
+      ],
+      "attr_name": "骑士的荣耀",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_e07b9b82",
+      "name": "骑士救援急救包",
+      "type": "consumable",
+      "keywords": [
+        "骑士救援急救包",
+        "骑士救援急救包"
+      ],
+      "attr_name": "骑士救援急救包",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_5dbf41c8",
+      "name": "不容错过的机会",
+      "type": "consumable",
+      "keywords": [
+        "不容错过的机会",
+        "不容错过的机会"
+      ],
+      "attr_name": "不容错过的机会",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_35bbf997",
+      "name": "眼睛闪闪发光",
+      "type": "consumable",
+      "keywords": [
+        "眼睛闪闪发光",
+        "眼睛闪闪发光"
+      ],
+      "attr_name": "眼睛闪闪发光",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_7373380d",
+      "name": "剧毒守望者",
+      "type": "consumable",
+      "keywords": [
+        "剧毒守望者",
+        "剧毒守望者"
+      ],
+      "attr_name": "剧毒守望者",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_1438f423",
+      "name": "德鲁伊竖琴",
+      "type": "consumable",
+      "keywords": [
+        "德鲁伊竖琴",
+        "德鲁伊竖琴"
+      ],
+      "attr_name": "德鲁伊竖琴",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_4f0edb59",
+      "name": "蕾塞特的抽奖券",
+      "type": "consumable",
+      "keywords": [
+        "蕾塞特的抽奖券",
+        "蕾塞特的抽奖券"
+      ],
+      "attr_name": "蕾塞特的抽奖券",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_9907d55f",
+      "name": "满意度调查",
+      "type": "consumable",
+      "keywords": [
+        "满意度调查",
+        "满意度调查"
+      ],
+      "attr_name": "满意度调查",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_9bcb1da9",
+      "name": "回响的祝福",
+      "type": "consumable",
+      "keywords": [
+        "回响的祝福",
+        "回响的祝福"
+      ],
+      "attr_name": "回响的祝福",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_ad1001ae",
+      "name": "害羞",
+      "type": "consumable",
+      "keywords": [
+        "害羞",
+        "害羞"
+      ],
+      "attr_name": "害羞",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_057eeca7",
+      "name": "空笼子",
+      "type": "consumable",
+      "keywords": [
+        "空笼子",
+        "空笼子"
+      ],
+      "attr_name": "空笼子",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_832577c9",
+      "name": "空药瓶",
+      "type": "consumable",
+      "keywords": [
+        "空药瓶",
+        "空药瓶"
+      ],
+      "attr_name": "空药瓶",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_52e3f2d9",
+      "name": "债务人的策略",
+      "type": "consumable",
+      "keywords": [
+        "债务人的策略",
+        "债务人的策略"
+      ],
+      "attr_name": "债务人的策略",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_6fb485ce",
+      "name": "石像之花",
+      "type": "consumable",
+      "keywords": [
+        "石像之花",
+        "石像之花"
+      ],
+      "attr_name": "石像之花",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_cb10a9d9",
+      "name": "石剑",
+      "type": "consumable",
+      "keywords": [
+        "石剑",
+        "石剑"
+      ],
+      "attr_name": "石剑",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_bdb9cd8a",
+      "name": "暖手宝",
+      "type": "consumable",
+      "keywords": [
+        "暖手宝",
+        "暖手宝"
+      ],
+      "attr_name": "暖手宝",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_fb3d1f2e",
+      "name": "可疑盒子",
+      "type": "consumable",
+      "keywords": [
+        "可疑盒子",
+        "可疑盒子"
+      ],
+      "attr_name": "可疑盒子",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_a5759694",
+      "name": "街头面包店 I",
+      "type": "consumable",
+      "keywords": [
+        "街头面包店 I",
+        "街头面包店I"
+      ],
+      "attr_name": "街头面包店 I",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_4216b1b6",
+      "name": "狙击手外套",
+      "type": "consumable",
+      "keywords": [
+        "狙击手外套",
+        "狙击手外套"
+      ],
+      "attr_name": "狙击手外套",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_55d5df2b",
+      "name": "号角",
+      "type": "consumable",
+      "keywords": [
+        "号角",
+        "号角"
+      ],
+      "attr_name": "号角",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_c078bbe0",
+      "name": "荣誉纪念碑",
+      "type": "consumable",
+      "keywords": [
+        "荣誉纪念碑",
+        "荣誉纪念碑"
+      ],
+      "attr_name": "荣誉纪念碑",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_900edb6a",
+      "name": "轨道搜索队徽章",
+      "type": "consumable",
+      "keywords": [
+        "轨道搜索队徽章",
+        "轨道搜索队徽章"
+      ],
+      "attr_name": "轨道搜索队徽章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_e34b0c5a",
+      "name": "学习助手",
+      "type": "consumable",
+      "keywords": [
+        "学习助手",
+        "学习助手"
+      ],
+      "attr_name": "学习助手",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_a3a09d34",
+      "name": "磁带录音机",
+      "type": "consumable",
+      "keywords": [
+        "磁带录音机",
+        "磁带录音机"
+      ],
+      "attr_name": "磁带录音机",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_9ad20b29",
+      "name": "最后一弹",
+      "type": "consumable",
+      "keywords": [
+        "最后一弹",
+        "最后一弹"
+      ],
+      "attr_name": "最后一弹",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_cd97aada",
+      "name": "马形石",
+      "type": "consumable",
+      "keywords": [
+        "马形石",
+        "马形石"
+      ],
+      "attr_name": "马形石",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_dfb3bf13",
+      "name": "Maison Delièr.",
+      "type": "consumable",
+      "keywords": [
+        "Maison Delièr.",
+        "MaisonDelièr"
+      ],
+      "attr_name": "Maison Delièr.",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f729142d",
+      "name": "闪亮手部喷雾器9号",
+      "type": "consumable",
+      "keywords": [
+        "闪亮手部喷雾器9号",
+        "闪亮手部喷雾器9号"
+      ],
+      "attr_name": "闪亮手部喷雾器9号",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_6cbaac97",
+      "name": "送货员的号角",
+      "type": "consumable",
+      "keywords": [
+        "送货员的号角",
+        "送货员的号角"
+      ],
+      "attr_name": "送货员的号角",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_ac66dee8",
+      "name": "星光勋章",
+      "type": "consumable",
+      "keywords": [
+        "星光勋章",
+        "星光勋章"
+      ],
+      "attr_name": "星光勋章",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_d4989e86",
+      "name": "星际守护者的旅程",
+      "type": "consumable",
+      "keywords": [
+        "星际守护者的旅程",
+        "星际守护者的旅程"
+      ],
+      "attr_name": "星际守护者的旅程",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_ab0d3cdd",
+      "name": "有缺陷的扑克牌",
+      "type": "consumable",
+      "keywords": [
+        "有缺陷的扑克牌",
+        "有缺陷的扑克牌"
+      ],
+      "attr_name": "有缺陷的扑克牌",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_cb70fca9",
+      "name": "温柔的呜鸣祖拉",
+      "type": "consumable",
+      "keywords": [
+        "温柔的呜鸣祖拉",
+        "温柔的呜鸣祖拉"
+      ],
+      "attr_name": "温柔的呜鸣祖拉",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_0168acc3",
+      "name": "寒尔凡德 噩梦 EX",
+      "type": "consumable",
+      "keywords": [
+        "寒尔凡德 噩梦 EX",
+        "寒尔凡德噩梦EX"
+      ],
+      "attr_name": "寒尔凡德 噩梦 EX",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_8c7c7b2a",
+      "name": "珍贵的日记本",
+      "type": "consumable",
+      "keywords": [
+        "珍贵的日记本",
+        "珍贵的日记本"
+      ],
+      "attr_name": "珍贵的日记本",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_9decf53c",
+      "name": "可疑的药瓶",
+      "type": "consumable",
+      "keywords": [
+        "可疑的药瓶",
+        "可疑的药瓶"
+      ],
+      "attr_name": "可疑的药瓶",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_c2562129",
+      "name": "手工兔子头箍",
+      "type": "consumable",
+      "keywords": [
+        "手工兔子头箍",
+        "手工兔子头箍"
+      ],
+      "attr_name": "手工兔子头箍",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_227fb64f",
+      "name": "星光游侠面具",
+      "type": "consumable",
+      "keywords": [
+        "星光游侠面具",
+        "星光游侠面具"
+      ],
+      "attr_name": "星光游侠面具",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f8500578",
+      "name": "邪恶巨龙刻耳柏洛斯模型",
+      "type": "consumable",
+      "keywords": [
+        "邪恶巨龙刻耳柏洛斯模型",
+        "邪恶巨龙刻耳柏洛斯模型"
+      ],
+      "attr_name": "邪恶巨龙刻耳柏洛斯模型",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_a7ba33ed",
+      "name": "孩童的英雄",
+      "type": "consumable",
+      "keywords": [
+        "孩童的英雄",
+        "孩童的英雄"
+      ],
+      "attr_name": "孩童的英雄",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_ea2e8036",
+      "name": "能量控制器",
+      "type": "consumable",
+      "keywords": [
+        "能量控制器",
+        "能量控制器"
+      ],
+      "attr_name": "能量控制器",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_dcde0d24",
+      "name": "温泉度假村特别会员资格",
+      "type": "consumable",
+      "keywords": [
+        "温泉度假村特别会员资格",
+        "温泉度假村特别会员资格"
+      ],
+      "attr_name": "温泉度假村特别会员资格",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_057f5eef",
+      "name": "宇宙视野",
+      "type": "consumable",
+      "keywords": [
+        "宇宙视野",
+        "宇宙视野"
+      ],
+      "attr_name": "宇宙视野",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f73de898",
+      "name": "玩偶服装制作套件",
+      "type": "consumable",
+      "keywords": [
+        "玩偶服装制作套件",
+        "玩偶服装制作套件"
+      ],
+      "attr_name": "玩偶服装制作套件",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_d3b6b372",
+      "name": "苍蓝之息",
+      "type": "consumable",
+      "keywords": [
+        "苍蓝之息",
+        "苍蓝之息"
+      ],
+      "attr_name": "苍蓝之息",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_9158856e",
+      "name": "新手女佣指南",
+      "type": "consumable",
+      "keywords": [
+        "新手女佣指南",
+        "新手女佣指南"
+      ],
+      "attr_name": "新手女佣指南",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f70f77f0",
+      "name": "城镇卫队标准手铐",
+      "type": "consumable",
+      "keywords": [
+        "城镇卫队标准手铐",
+        "城镇卫队标准手铐"
+      ],
+      "attr_name": "城镇卫队标准手铐",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_1b8c4545",
+      "name": "特尔米尔萨安全腰带",
+      "type": "consumable",
+      "keywords": [
+        "特尔米尔萨安全腰带",
+        "特尔米尔萨安全腰带"
+      ],
+      "attr_name": "特尔米尔萨安全腰带",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_18682c3a",
+      "name": "兔子绅士",
+      "type": "consumable",
+      "keywords": [
+        "兔子绅士",
+        "兔子绅士"
+      ],
+      "attr_name": "兔子绅士",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_a22673f6",
+      "name": "投资推荐传单",
+      "type": "consumable",
+      "keywords": [
+        "投资推荐传单",
+        "投资推荐传单"
+      ],
+      "attr_name": "投资推荐传单",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_2fc2b84a",
+      "name": "人偶遗留的护甲",
+      "type": "consumable",
+      "keywords": [
+        "人偶遗留的护甲",
+        "人偶遗留的护甲"
+      ],
+      "attr_name": "人偶遗留的护甲",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_81e9d10c",
+      "name": "人偶遗留的披风",
+      "type": "consumable",
+      "keywords": [
+        "人偶遗留的披风",
+        "人偶遗留的披风"
+      ],
+      "attr_name": "人偶遗留的披风",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_42b71bac",
+      "name": "人偶遗留的手甲",
+      "type": "consumable",
+      "keywords": [
+        "人偶遗留的手甲",
+        "人偶遗留的手甲"
+      ],
+      "attr_name": "人偶遗留的手甲",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_d8fe890d",
+      "name": "人偶遗留的眼镜",
+      "type": "consumable",
+      "keywords": [
+        "人偶遗留的眼镜",
+        "人偶遗留的眼镜"
+      ],
+      "attr_name": "人偶遗留的眼镜",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_45ad15f2",
+      "name": "人偶遗留的护手",
+      "type": "consumable",
+      "keywords": [
+        "人偶遗留的护手",
+        "人偶遗留的护手"
+      ],
+      "attr_name": "人偶遗留的护手",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_d557f935",
+      "name": "人偶遗留的臂凯",
+      "type": "consumable",
+      "keywords": [
+        "人偶遗留的臂凯",
+        "人偶遗留的臂凯"
+      ],
+      "attr_name": "人偶遗留的臂凯",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_337966c6",
+      "name": "人偶遗留的头盔",
+      "type": "consumable",
+      "keywords": [
+        "人偶遗留的头盔",
+        "人偶遗留的头盔"
+      ],
+      "attr_name": "人偶遗留的头盔",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_7bd1125f",
+      "name": "人偶遗留的项链",
+      "type": "consumable",
+      "keywords": [
+        "人偶遗留的项链",
+        "人偶遗留的项链"
+      ],
+      "attr_name": "人偶遗留的项链",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_fccd25b8",
+      "name": "人偶遗留的护腿",
+      "type": "consumable",
+      "keywords": [
+        "人偶遗留的护腿",
+        "人偶遗留的护腿"
+      ],
+      "attr_name": "人偶遗留的护腿",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_a4f7cb34",
+      "name": "人偶遗留的靴子",
+      "type": "consumable",
+      "keywords": [
+        "人偶遗留的靴子",
+        "人偶遗留的靴子"
+      ],
+      "attr_name": "人偶遗留的靴子",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_e3dce66a",
+      "name": "人偶遗留的图腾",
+      "type": "consumable",
+      "keywords": [
+        "人偶遗留的图腾",
+        "人偶遗留的图腾"
+      ],
+      "attr_name": "人偶遗留的图腾",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_c9e9506b",
+      "name": "中苹姆附着的护甲",
+      "type": "consumable",
+      "keywords": [
+        "中苹姆附着的护甲",
+        "中苹姆附着的护甲"
+      ],
+      "attr_name": "中苹姆附着的护甲",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f225b0cf",
+      "name": "史莱姆附着的披风",
+      "type": "consumable",
+      "keywords": [
+        "史莱姆附着的披风",
+        "史莱姆附着的披风"
+      ],
+      "attr_name": "史莱姆附着的披风",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_4efc2f62",
+      "name": "史莱姆附着的眼镜",
+      "type": "consumable",
+      "keywords": [
+        "史莱姆附着的眼镜",
+        "史莱姆附着的眼镜"
+      ],
+      "attr_name": "史莱姆附着的眼镜",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_123e1de1",
+      "name": "史莱姆附着的护手",
+      "type": "consumable",
+      "keywords": [
+        "史莱姆附着的护手",
+        "史莱姆附着的护手"
+      ],
+      "attr_name": "史莱姆附着的护手",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_83f7b5f2",
+      "name": "史莱姆附着的臂铠",
+      "type": "consumable",
+      "keywords": [
+        "史莱姆附着的臂铠",
+        "史莱姆附着的臂铠"
+      ],
+      "attr_name": "史莱姆附着的臂铠",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_b7a67acb",
+      "name": "史莱姆附着的头盔",
+      "type": "consumable",
+      "keywords": [
+        "史莱姆附着的头盔",
+        "史莱姆附着的头盔"
+      ],
+      "attr_name": "史莱姆附着的头盔",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_1f9a8301",
+      "name": "史莱姆附着的项链",
+      "type": "consumable",
+      "keywords": [
+        "史莱姆附着的项链",
+        "史莱姆附着的项链"
+      ],
+      "attr_name": "史莱姆附着的项链",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_83d7b395",
+      "name": "史莱姆附着的护腿",
+      "type": "consumable",
+      "keywords": [
+        "史莱姆附着的护腿",
+        "史莱姆附着的护腿"
+      ],
+      "attr_name": "史莱姆附着的护腿",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_000835de",
+      "name": "史莱姆附着的靴子",
+      "type": "consumable",
+      "keywords": [
+        "史莱姆附着的靴子",
+        "史莱姆附着的靴子"
+      ],
+      "attr_name": "史莱姆附着的靴子",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_4c989b74",
+      "name": "启示录新型护.甲",
+      "type": "consumable",
+      "keywords": [
+        "启示录新型护.甲",
+        "启示录新型护甲"
+      ],
+      "attr_name": "启示录新型护.甲",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_a55afcae",
+      "name": "启示录新型披风",
+      "type": "consumable",
+      "keywords": [
+        "启示录新型披风",
+        "启示录新型披风"
+      ],
+      "attr_name": "启示录新型披风",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_c9e8abf8",
+      "name": "启示录新型眼镜",
+      "type": "consumable",
+      "keywords": [
+        "启示录新型眼镜",
+        "启示录新型眼镜"
+      ],
+      "attr_name": "启示录新型眼镜",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_84c6fe11",
+      "name": "启示录新型护手",
+      "type": "consumable",
+      "keywords": [
+        "启示录新型护手",
+        "启示录新型护手"
+      ],
+      "attr_name": "启示录新型护手",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_777b37f1",
+      "name": "启示录新型臂铠",
+      "type": "consumable",
+      "keywords": [
+        "启示录新型臂铠",
+        "启示录新型臂铠"
+      ],
+      "attr_name": "启示录新型臂铠",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_19aa6e57",
+      "name": "启示录新型头盔",
+      "type": "consumable",
+      "keywords": [
+        "启示录新型头盔",
+        "启示录新型头盔"
+      ],
+      "attr_name": "启示录新型头盔",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_a374887b",
+      "name": "启示录新型项链",
+      "type": "consumable",
+      "keywords": [
+        "启示录新型项链",
+        "启示录新型项链"
+      ],
+      "attr_name": "启示录新型项链",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_d5b8a198",
+      "name": "启示录新型护腿",
+      "type": "consumable",
+      "keywords": [
+        "启示录新型护腿",
+        "启示录新型护腿"
+      ],
+      "attr_name": "启示录新型护腿",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_50d8f4c7",
+      "name": "启示录新型靴子",
+      "type": "consumable",
+      "keywords": [
+        "启示录新型靴子",
+        "启示录新型靴子"
+      ],
+      "attr_name": "启示录新型靴子",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_d7b6b42e",
+      "name": "远古救世主的护甲",
+      "type": "consumable",
+      "keywords": [
+        "远古救世主的护甲",
+        "远古救世主的护甲"
+      ],
+      "attr_name": "远古救世主的护甲",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_0543e6d7",
+      "name": "远古救世主的手甲",
+      "type": "consumable",
+      "keywords": [
+        "远古救世主的手甲",
+        "远古救世主的手甲"
+      ],
+      "attr_name": "远古救世主的手甲",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_b4072323",
+      "name": "远古救世主的披风",
+      "type": "consumable",
+      "keywords": [
+        "远古救世主的披风",
+        "远古救世主的披风"
+      ],
+      "attr_name": "远古救世主的披风",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_3079bc06",
+      "name": "远古救世主的头盔",
+      "type": "consumable",
+      "keywords": [
+        "远古救世主的头盔",
+        "远古救世主的头盔"
+      ],
+      "attr_name": "远古救世主的头盔",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_46cae1cd",
+      "name": "远古救世主的项链",
+      "type": "consumable",
+      "keywords": [
+        "远古救世主的项链",
+        "远古救世主的项链"
+      ],
+      "attr_name": "远古救世主的项链",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_4dbf7268",
+      "name": "远古救世主的护腿",
+      "type": "consumable",
+      "keywords": [
+        "远古救世主的护腿",
+        "远古救世主的护腿"
+      ],
+      "attr_name": "远古救世主的护腿",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_38c387c0",
+      "name": "远古救世主的臂铠",
+      "type": "consumable",
+      "keywords": [
+        "远古救世主的臂铠",
+        "远古救世主的臂铠"
+      ],
+      "attr_name": "远古救世主的臂铠",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_2da7aa16",
+      "name": "远古救世主的靴子",
+      "type": "consumable",
+      "keywords": [
+        "远古救世主的靴子",
+        "远古救世主的靴子"
+      ],
+      "attr_name": "远古救世主的靴子",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_da34af27",
+      "name": "远古救世主的眼镜",
+      "type": "consumable",
+      "keywords": [
+        "远古救世主的眼镜",
+        "远古救世主的眼镜"
+      ],
+      "attr_name": "远古救世主的眼镜",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_f491f7ea",
+      "name": "远古救世主的护手",
+      "type": "consumable",
+      "keywords": [
+        "远古救世主的护手",
+        "远古救世主的护手"
+      ],
+      "attr_name": "远古救世主的护手",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_b42d62a0",
+      "name": "远古救世主图图腾",
+      "type": "consumable",
+      "keywords": [
+        "远古救世主图图腾",
+        "远古救世主图图腾"
+      ],
+      "attr_name": "远古救世主图图腾",
+      "value": 0,
+      "priority": null,
+      "note": "Wiki import 2026-05-26 17:01:55"
+    },
+    {
+      "id": "shop_c186e815",
+      "name": "潜质",
+      "type": "potential_points",
+      "keywords": [
+        "潜质点数10增加",
+        "@效果 0 潜质点数10增加"
+      ],
+      "attr_name": "潜质",
+      "value": 10,
+      "priority": 2,
+      "note": "Auto-learned 2026-05-26 20:16:11. Raw: 潜质点数10增加",
+      "name_keys": [
+        "潜质点数10增加"
+      ],
+      "effect_keys": [
+        "潜质点数"
+      ]
+    },
+    {
+      "id": "shop_2555bc8f",
+      "name": "：到90以",
+      "type": "effect__到90以",
+      "keywords": [
+        "：到90以"
+      ],
+      "attr_name": "：到90以",
+      "value": 0,
+      "priority": 9,
+      "note": "Auto-learned 2026-05-26 20:24:47. Raw: ：到90以",
+      "name_keys": [
+        "：到90以"
+      ],
+      "effect_keys": []
+    },
+    {
+      "id": "shop_a224f2c7",
+      "name": "0家蚌蔬菜纟0",
+      "type": "attribute_boost",
+      "keywords": [
+        "0家蚌蔬菜纟0 @效果 0 专注16增加 保护16增加"
+      ],
+      "name_keys": [
+        "0家蚌蔬菜纟0"
+      ],
+      "effect_keys": [
+        "0家蚌蔬菜纟0 @效果 0 专注16增加 保护16增加"
+      ],
+      "attr_name": "@效果 0 专注",
+      "value": 16,
+      "priority": 4,
+      "note": "Auto-learned 2026-05-27 01:24:40. Raw: 0家蚌蔬菜纟0 @效果 0 专注16增加 保护16增加"
+    },
+    {
+      "id": "shop_837b8897",
+      "name": "+用深，+像平",
+      "type": "effect__用深__像平",
+      "keywords": [
+        "+用深， +像平"
+      ],
+      "name_keys": [
+        "+用深，+像平"
+      ],
+      "effect_keys": [
+        "+用深， +像平"
+      ],
+      "attr_name": "+用深，+像平",
+      "value": 0,
+      "priority": 9,
+      "note": "Auto-learned 2026-05-27 02:41:04. Raw: +用深， +像平"
+    },
+    {
+      "id": "shop_005123e0",
+      "name": "特制摩利安脆皮疱",
+      "type": "attribute_boost",
+      "keywords": [
+        "特制摩利安脆皮疱 @效果 0 专注20增加 0 力量5增加"
+      ],
+      "name_keys": [
+        "特制摩利安脆皮疱"
+      ],
+      "effect_keys": [
+        "特制摩利安脆皮疱 @效果 0 专注20增加 0 力量5增加"
+      ],
+      "attr_name": "@效果 0 专注",
+      "value": 20,
+      "priority": 4,
+      "note": "Auto-learned 2026-05-27 02:58:37. Raw: 特制摩利安脆皮疱 @效果 0 专注20增加 0 力量5增加"
+    },
+    {
+      "id": "shop_fb8d1777",
+      "name": "拿利安皮氵",
+      "type": "attribute_boost",
+      "keywords": [
+        "拿利安皮氵 @效果 0 专注20增加 0 力量5增加"
+      ],
+      "name_keys": [
+        "拿利安皮氵"
+      ],
+      "effect_keys": [
+        "拿利安皮氵 @效果 0 专注20增加 0 力量5增加"
+      ],
+      "attr_name": "@效果 0 专注",
+      "value": 20,
+      "priority": 4,
+      "note": "Auto-learned 2026-05-27 02:58:38. Raw: 拿利安皮氵 @效果 0 专注20增加 0 力量5增加"
+    },
+    {
+      "id": "shop_fcbe10b1",
+      "name": "\"过中川练、必笈",
+      "type": "training_exp",
+      "keywords": [
+        "\"过中川练、必笈 @效果 0专注训练经验值增加"
+      ],
+      "name_keys": [
+        "\"过中川练、必笈"
+      ],
+      "effect_keys": [
+        "\"过中川练、必笈 @效果 0专注训练经验值增加"
+      ],
+      "attr_name": "专注",
+      "value": 0,
+      "priority": 5,
+      "note": "Auto-learned 2026-05-27 02:58:39. Raw: \"过中川练、必笈 @效果 0专注训练经验值增加"
+    },
+    {
+      "id": "shop_f9a68c32",
+      "name": "乃油义大利面",
+      "type": "attribute_boost",
+      "keywords": [
+        "乃油义大利面 @效果 0 体力12增加"
+      ],
+      "name_keys": [
+        "乃油义大利面"
+      ],
+      "effect_keys": [
+        "乃油义大利面 @效果 0 体力12增加"
+      ],
+      "attr_name": "@效果 0 体力",
+      "value": 12,
+      "priority": 4,
+      "note": "Auto-learned 2026-05-27 03:06:24. Raw: 乃油义大利面 @效果 0 体力12增加"
+    },
+    {
+      "id": "shop_39807b8e",
+      "name": "@效果 0韧性",
+      "type": "attribute_boost",
+      "keywords": [
+        "@效果 0韧性5增加 专注5增加"
+      ],
+      "name_keys": [
+        "@效果 0韧性"
+      ],
+      "effect_keys": [
+        "@效果 0韧性5增加 专注5增加"
+      ],
+      "attr_name": "@效果 0韧性",
+      "value": 5,
+      "priority": 4,
+      "note": "Auto-learned 2026-05-27 03:06:25. Raw: @效果 0韧性5增加 专注5增加"
+    },
+    {
+      "id": "shop_31ed89b3",
+      "name": "．利",
+      "type": "attribute_boost",
+      "keywords": [
+        "．利 @效果 0 力量4增加"
+      ],
+      "name_keys": [
+        "．利"
+      ],
+      "effect_keys": [
+        "．利 @效果 0 力量4增加"
+      ],
+      "attr_name": "@效果 0 力量",
+      "value": 4,
+      "priority": 4,
+      "note": "Auto-learned 2026-05-27 03:06:26. Raw: ．利 @效果 0 力量4增加"
+    },
+    {
+      "id": "shop_f4906876",
+      "name": "免费",
+      "type": "stamina_recovery",
+      "keywords": [
+        "免费 效果 耐力30恢复 低机率获得负面旅程状态"
+      ],
+      "name_keys": [
+        "免费"
+      ],
+      "effect_keys": [
+        "免费 效果 耐力30恢复 低机率获得负面旅程状态"
+      ],
+      "attr_name": "耐力",
+      "value": 30,
+      "priority": 1,
+      "note": "Auto-learned 2026-10-06 17:48:39. Raw: 免费 效果 耐力30恢复 低机率获得负面旅程状态"
+    },
+    {
+      "id": "shop_f253ddb0",
+      "name": "效果耐力60~80恢复获得增益旅程状态低机率解除所有负面旅程",
+      "type": "effect_效果耐力60_80恢复获",
+      "keywords": [
+        "效果 耐力60~80恢复 获得增益旅程状态 低机率解除所有负面旅程状态"
+      ],
+      "name_keys": [
+        "效果耐力60~80恢复获得增益旅程状态低机率解除所有负面旅程"
+      ],
+      "effect_keys": [
+        "效果 耐力60~80恢复 获得增益旅程状态 低机率解除所有负面旅程状态"
+      ],
+      "attr_name": "效果耐力60~80恢复获得增益旅程状态低机率解除所有负面旅程",
+      "value": 0,
+      "priority": 9,
+      "note": "Auto-learned 2026-10-06 17:48:41. Raw: 效果 耐力60~80恢复 获得增益旅程状态 低机率解除所有负面旅程状态"
+    },
+    {
+      "id": "shop_f891ae3e",
+      "name": "吸血鬼冰沙",
+      "type": "status_buff",
+      "keywords": [
+        "吸血鬼冰沙 效果 甜蜜余味状态获得"
+      ],
+      "name_keys": [
+        "吸血鬼冰沙"
+      ],
+      "effect_keys": [
+        "吸血鬼冰沙 效果 甜蜜余味状态获得"
+      ],
+      "attr_name": "效果 甜蜜余味",
+      "value": 0,
+      "priority": 6,
+      "note": "Auto-learned 2026-10-07 14:08:04. Raw: 吸血鬼冰沙 效果 甜蜜余味状态获得"
+    },
+    {
+      "id": "shop_7d6d1054",
+      "name": "效果 专注",
+      "type": "attribute_boost",
+      "keywords": [
+        "效果 专注20增加 力量5增加"
+      ],
+      "name_keys": [
+        "效果 专注"
+      ],
+      "effect_keys": [
+        "效果 专注20增加 力量5增加"
+      ],
+      "attr_name": "效果 专注",
+      "value": 20,
+      "priority": 4,
+      "note": "Auto-learned 2026-10-07 14:08:05. Raw: 效果 专注20增加 力量5增加"
+    }
+  ]
+}

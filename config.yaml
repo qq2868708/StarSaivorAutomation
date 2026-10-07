@@ -1,0 +1,311 @@
+# ============================================================
+# StarSavior 训练自动化机器人 - 配置文件
+# 修改此文件来控制训练行为，启动脚本前请确认配置正确
+# ============================================================
+
+# ------------------------ 游戏设置 ----------------------------
+game:
+  window_title: "StarSavior"        # 游戏窗口标题（部分匹配即可）
+  windowed_mode: true               # 是否窗口模式（建议开启）
+
+# 只有本地快查中已核对的事件才自动选择；未知事件停在选项页，不盲选或逐项试点。
+events:
+  require_document_effects: true
+  reference_document: "https://docs.qq.com/sheet/DZkh2QmxKdnJUaVpw?tab=6chp1"
+  # 本地静态快查索引；事件效果仍需 document_verified=true 才允许自动选择。
+  quick_lookup: "profiles/events/document_verified.json"
+
+# ------------------------ 属性定义 ----------------------------
+# 枚举值 1-5 分别对应属性
+attributes:
+  1: "力量"
+  2: "生命"
+  3: "韧性"
+  4: "专注"
+  5: "保护"
+
+# ------------------------ 训练策略 ----------------------------
+training:
+  # --- 扫描模式 ---
+  # "fast"   = 只点击主属性行读取真实失败率, 其他耐力推导 (最快)
+  # "normal" = 点击力量/体力/韧性(3行), 专注/保护耐力推导 (平衡)
+  # "focus"  = 逐行点击全部5行读取真实失败率 (最精确, 最慢)
+  scan_mode: "normal"
+
+  # --- 规则引擎模式 (推荐) ---
+  # 使用 JSON 规则配置文件进行决策 (移植自 SleepRunner 规则引擎)
+  rule_profile: "speed"             # 规则配置文件名 (位于 profiles/training/ 目录, 不含扩展名)
+                                    # 可选: attack, survival, default, speed
+                                    # 设为空字符串 "" 则使用下面的传统权重模式
+
+  # --- 传统权重模式 (rule_profile 为空时启用) ---
+  priority: 1                      # 【核心配置】优先训练哪个属性（填枚举值 1-5）
+
+  failure_threshold: 20            # 【核心】普通失败率阈值（%），≥此值且无闪光训练 → 休息
+  flash_fail_threshold: 80         # 闪光训练时的失败率阈值（%），图标数≥3时生效
+  flash_icon_threshold: 3          # 图标数≥此值视为"闪光训练"（多人头高收益）
+
+  min_gain_threshold: 3            # 优先属性增益低于此值时，认为"不够好"
+
+  # 冒险阈值: 单次训练增益 >= 此值 → 即使失败率高也值得训练
+  # 设为 0 则禁用冒险逻辑 (失败率>=20%就直接休息)
+  adventure_gain_threshold: 100
+
+  # AI 决策权重（优先属性不达标时的评分权重）
+  weights:
+    priority_bonus: 40             # 优先属性额外加分
+    gain_score: 35                 # 属性增益分值权重
+    failure_penalty: 25            # 失败率惩罚权重
+
+  # 属性目标值 (0=不限制, 用于训练评分降权: 接近目标时降低该训练优先级)
+  target_stats:
+    strength: 0                    # 力量目标 (0=不限制)
+    stamina: 0                     # 体力目标
+    agility: 0                     # 韧性目标
+    focus: 0                       # 专注目标
+    guard: 0                       # 保护目标
+
+  # --- 高级: 每行独立失败率 (推荐开启) ---
+  # true = OCR读取每行独立的"失败率" (移植自SleepRunner, 更精确)
+  # false = 所有行共用体力推导的失败率 (简单稳定)
+  per_row_fail_rate: true
+
+  # --- 高级: 图标计数 (推荐开启) ---
+  # true = 使用HSV检测圆形图标数来评估训练质量 (移植自SleepRunner)
+  # false = 仅使用OCR增益值评估
+  icon_counting: true
+
+  # --- 优势训练标记 ---
+  # 训练行右侧的蓝色大拇指标记。识别到后将该行评分乘以此倍率；
+  # 失败率/体力安全规则仍优先于训练评分。
+  advantage_multiplier: 1.35
+
+  # --- 高级: 每行失败率OCR区域 (百分比坐标 [x, y, w, h]) ---
+  # 以失败率红色文字为中心扩展, 避免捕获到相邻行文字
+  # 修改后需重新校准 (运行 test_fail_rate_pos.py)
+  fail_rate_regions:
+    - [0.855, 0.265, 0.10, 0.06]    # 力量训练
+    - [0.855, 0.362, 0.10, 0.06]    # 体力训练
+    - [0.855, 0.470, 0.10, 0.06]    # 韧性训练
+    - [0.854, 0.570, 0.10, 0.06]    # 集中训练
+    - [0.854, 0.673, 0.10, 0.06]    # 保护训练
+
+# ------------------------ 休息策略 ----------------------------
+rest:
+  # 触发休息的条件
+  trigger_failure_threshold: 20    # 失败率超过此值且没好的训练属性时触发休息
+
+  # 休息回退: 体力≥此值且金钱不够付费休息时 → 继续训练而非免费休息
+  stamina_continue_threshold: 80   # 体力≥80%时, 没钱付费休息就继续训练
+
+  # 第一年特殊策略
+  first_year_rounds: 12            # 前 N 轮视为"第一年"（0=禁用）
+                                   # 第一年：没好的训练属性 + 心情非Best → 强制用第二种休息（提高心情）
+
+  # 三种休息方式
+  options:
+    1:
+      name: "免费休息"
+      cost: 0
+      stamina_recover: 30          # 恢复体力%
+      description: "免费，恢复30%体力"
+    2:
+      name: "付费休息($30)"
+      cost: 30
+      stamina_recover: 30          # 基础恢复，有概率恢复50%
+      stamina_bonus_chance: 50     # 有概率额外恢复到50%
+      mood_boost: true             # 提升心情
+      description: "花费$30，恢复30%体力(概率50%)，提升心情"
+    3:
+      name: "高级休息($60)"
+      cost: 60
+      stamina_recover: 60          # 基础恢复，有概率恢复80%
+      stamina_bonus_chance: 50     # 有概率额外恢复到80%
+      training_bonus: true         # 随机训练加成
+      description: "花费$60，恢复60%体力(概率50%恢复到80%)，随机获得训练加成"
+
+  # 选择优先级规则
+  selection:
+    # 体力阈值: 心情Best时, 体力>此值→免费休息, 体力<=此值→高级休息
+    best_mood_free_stamina: 40
+
+    # 规则1: 心情Best 且 体力>40% → 免费休息
+    # 规则2: 心情Best 且 体力<=40% → 高级休息($60)
+    # 规则3: 心情非Best → 付费休息($30)
+    # 规则4: 其他情况 → 免费休息
+    # （第一年特殊规则优先于上述所有规则）
+
+# ------------------------ 心情系统 ----------------------------
+mood:
+  # 心情等级（游戏内使用英文表达），数字越大越好
+  levels:
+    0: "Worst"
+    1: "Bad"
+    2: "Normal"
+    3: "Good"
+    4: "Best"
+
+  # 心情影响：心情越好，训练给的属性越高（增益倍率）
+  gain_multiplier:
+    Worst: 0.6
+    Bad: 0.8
+    Normal: 1.0
+    Good: 1.2
+    Best: 1.5
+
+# ------------------------ 操作设置 ----------------------------
+operation:
+  click_delay: 0.15                # 点击后等待（秒）
+  action_interval: 0.3             # 每次操作间隔（秒）
+  max_rounds: 0                    # 开发阶段跑到旅程结束（0 = 无限；正式运行仍受超时保护）
+  hotkey_start: "f5"               # 开始训练的热键（如果需要）
+  hotkey_confirm: "enter"          # 确认训练的热键
+
+# ------------------------ 保护机制 ----------------------------
+safety:
+  max_runtime_minutes: 45          # 单次跑马最大时长 (分钟), 超时自动暂停并触发AI分析
+  stuck_threshold: 5               # 连续 N 轮 UnknownHandler → 视为卡死, 暂停分析
+  round_timeout_seconds: 60        # 同一轮次超过此秒数 → 视为卡死, 暂停分析
+
+# ------------------------ 卡片选择策略 ----------------------------
+card_select:
+  # 速度最优先 (出现速度属性的卡片时优先选择)
+  speed_first: true
+
+  # 攻击向 (力量优先) 卡片优先级 (高→低)
+  attack_priority:
+    - "暴击率"
+    - "暴击伤害"
+    - "攻击力"
+
+  # 生存向 (体力优先) 卡片优先级 (高→低)
+  survival_priority:
+    - "生命力"
+    - "防御力"
+
+# ------------------------ 阿尔克那支援卡 ----------------------------
+# 旧版底部横排卡片坐标保留供诊断；当前客户端训练流程不执行此点击分支。
+arcanum:
+  enabled: false                     # 停用会将角色立绘误判为卡片的直接点击
+
+  # 支援卡行区域 (相对于游戏窗口的百分比坐标)
+  card_row_y: 0.60                  # 卡片行顶部 Y (基于水平边缘检测)
+  card_row_h: 0.24                  # 卡片行高度
+  card_area_x: 0.18                 # 卡片区域左侧 X (避开左侧属性面板)
+  card_area_w: 0.65                 # 卡片区域总宽度 (到训练按钮前)
+  card_count: 5                     # 支援卡数量
+
+  # 每张卡片内部布局 (相对于单张卡片)
+  # 左上角属性图标
+  icon_x_offset: 0.05
+  icon_y_offset: 0.02
+  icon_w: 0.30
+  icon_h: 0.18
+
+  # 属性名称文字 (图标旁边)
+  label_x_offset: 0.05
+  label_y_offset: 0.02
+  label_w: 0.70
+  label_h: 0.18
+
+  # 羁绊进度条 (头像下方)
+  bond_bar_x_offset: 0.10
+  bond_bar_y_offset: 0.82
+  bond_bar_w: 0.80
+  bond_bar_h: 0.08
+
+  # 点击位置 (卡片中心偏上)
+  click_y_offset: 0.45
+
+  # 羁绊检测
+  bond_yellow_ratio: 0.35            # 进度条中黄色像素占比阈值
+  post_click_wait: 1.0               # 点击支援卡后等待(秒)
+
+  # 回合限制: 前N回合优先点满羁绊, 超过后正常训练
+  turn_limit: 10                     # 优先点羁绊的回合数 (1-45)
+
+  # 图标优先: 前N回合全扫描5行找图标最多的训练 (增加支援卡羁绊)
+  icon_priority_limit: 20            # 设为 0 禁用
+
+  # 回合检测: 点击菜单后OCR区域 (百分比坐标)
+  turn_menu_x: 0.065                 # 菜单按钮 X
+  turn_menu_y: 0.065                 # 菜单按钮 Y
+  turn_ocr_region: [0.30, 0.69, 0.12, 0.08]  # OCR区域 [x, y, w, h] — 14/45 实测在 (0.342, 0.715)
+
+# ------------------------ 合宿策略 ----------------------------
+# 30回合开始进入合宿 (大量属性加成), 25-29回合预合宿蓄力
+camp:
+  camp_start_turn: 30                # 合宿开始回合
+  camp_end_turn: 38                  # 合宿结束回合 (38回合后恢复正常训练决策)
+  pre_camp_start_turn: 25            # 预合宿开始回合 (开始蓄力)
+  pre_camp_min_gain: 35              # 预合宿期间训练增益 < 此值 → 改为休息蓄力 (0=禁用)
+  camp_min_coins: 80                 # 进入合宿前至少确保的金钱数
+  camp_rest_fail_threshold: 50       # 合宿期间休息容忍度: 失败率 ≥ 此值才休息 (默认20→50更激进)
+
+  # 合宿类型: "strength"=弗洛拉(力量加成), "stamina"=卡莱德(体力加成)
+  camp_type: "strength"
+  # 加成属性增益 > 此值才触发激进训练 (失败率20-50%仍训练), 否则20%就去休息
+  camp_high_gain_threshold: 45
+
+# ------------------------ 地区移动/列车月台 ----------------------------
+# 跑马过程中会出现 "地区移动" 特殊事件, 需要选择月台选项
+move_platform:
+  option_index: 1                    # 选项序号 (1 或 2), attack/speed/default=1, survival=2
+
+# ------------------------ 讨伐委托 ----------------------------
+commission:
+  enabled: true                      # 是否启用自动讨伐委托
+  rank_threshold: 5                  # RANK差阈值: 当前RANK不低于(建议等级-阈值)则执行
+
+# ------------------------ 商店/交易 ----------------------------
+shop:
+  enabled: true                      # 是否启用自动商店购买
+
+  # 物品类型优先级 (越靠前越优先, 可自行调整顺序)
+  item_priority:
+    - "mood_recovery"                # 心情恢复 (非Best时最优先)
+    - "stamina_recovery"             # 耐力恢复
+    - "potential_points"             # 潜质点数增加
+    - "vitality_potion"              # 活力药水 (训练失败时可继续训练)
+    - "attribute_boost"              # 属性增加 (匹配优先属性)
+    - "training_exp"                 # 训练经验增加 (只买匹配优先属性的, 专注/保护永不购买)
+    - "status_buff"                  # 状态获得
+    - "random_effect"                # 随机效果 (点击查看加成属性, 匹配优先属性则购买)
+    - "consumable"                   # 通用消耗品 (食物/药水等)
+
+  # 交易按钮位置 (训练主屏右侧, 百分比坐标) - 已通过实际截图校准
+  trade_button_x: 0.89
+  trade_button_y: 0.56
+
+  # 评鉴战按钮位置 (训练主屏右侧, 百分比坐标) - 已通过实际截图校准
+  appraisal_button_x: 0.88
+  appraisal_button_y: 0.47
+
+  # 物品 OCR 区域 (3个物品, 从上到下, 右侧面板) - 已通过实际截图校准
+  item_regions:
+    - [0.80, 0.37, 0.12, 0.11]      # 物品1
+    - [0.80, 0.48, 0.12, 0.09]      # 物品2
+    - [0.80, 0.59, 0.12, 0.09]      # 物品3
+
+  # 物品点击位置 (对应上方3个物品) - 已通过实际截图校准
+  item_click_points:
+    - [0.86, 0.42]                   # 物品1
+    - [0.86, 0.53]                   # 物品2
+    - [0.86, 0.63]                   # 物品3
+
+  # 购买确认按钮 - 已通过实际截图校准
+  buy_confirm_x: 0.86
+  buy_confirm_y: 0.90
+
+  # 购买后推进
+  post_purchase_clicks: 3
+  post_purchase_interval: 0.4
+  post_purchase_wait: 1.2
+
+# ------------------------ 旅程结束 ----------------------------
+journey_end:
+  auto_learn_skills: true              # true=自动学习技能, false=停留在旅程结束画面
+  pause_for_manual: true               # 最终结算页暂停，交由人工处理潜质/奖励
+  confidence: 0.8                  # 模板匹配置信度阈值（0-1，越高越严格）
+  ocr_lang: "ch"                   # OCR 语言（ch=中文）
+  game_region: null                # 游戏窗口区域 [x, y, w, h]，null=自动检测

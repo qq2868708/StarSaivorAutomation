@@ -1,0 +1,20 @@
+{
+  "_comment": "速度向技能选择配置 - OCR关键词 → 优先级",
+  "direction": "speed",
+  "skills": [
+    {"name": "集中力", "priority": 10, "keywords": ["集中力", "集中"]},
+    {"name": "逃げ上手", "priority": 10, "keywords": ["逃げ上手", "逃脱高手", "逃げ"]},
+    {"name": "先駆け", "priority": 9, "keywords": ["先駆け", "先驱", "先駆"]},
+    {"name": "スピードスター", "priority": 9, "keywords": ["速度之星", "スピードスター", "速度星"]},
+    {"name": "ハイペース", "priority": 8, "keywords": ["快节奏", "ハイペース", "快"]},
+    {"name": "末脚", "priority": 8, "keywords": ["末脚", "最终冲刺", "末"]},
+    {"name": "先行", "priority": 7, "keywords": ["先行", "先行策"]},
+    {"name": "差し", "priority": 7, "keywords": ["差し", "差切", "差"]},
+    {"name": "追込", "priority": 7, "keywords": ["追込", "追入", "追"]},
+    {"name": "コーナー加速", "priority": 6, "keywords": ["弯道加速", "コーナー加速", "弯道"]},
+    {"name": "直線加速", "priority": 6, "keywords": ["直线加速", "直線加速", "直线"]},
+    {"name": "全身全霊", "priority": 5, "keywords": ["全身全霊", "全身全灵", "全身"]},
+    {"name": "怪力", "priority": 5, "keywords": ["怪力", "怪力无双"]},
+    {"name": "円弧のマエストロ", "priority": 5, "keywords": ["圆弧大师", "円弧", "圆弧"]}
+  ]
+}

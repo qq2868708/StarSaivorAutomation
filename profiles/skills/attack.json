@@ -1,0 +1,70 @@
+{
+  "_comment": "攻击向技能选择配置 (按用户指定优先级排序, 10=最高, 1=最低)",
+  "direction": "attack",
+  "_notes": {
+    "scrolling": "技能列表可能需要上下划动查找, 后续实现滑动逻辑",
+    "learn_button": "找到技能后需沿x轴右移至学习按钮位置",
+    "multi_level": "技巧类/感知类技能可学习5个等级, 最多点击5次学习按钮",
+    "variable_name": "星光轨迹-XXX号 中的XXX为变量, 用前缀匹配"
+  },
+  "skills": [
+    {
+      "name": "星光轨迹",
+      "priority": 10,
+      "keywords": ["星光轨迹", "星光"],
+      "variable_suffix": true,
+      "note": "最高优先级, XXX号为变量任意值"
+    },
+    {
+      "name": "血之回声",
+      "priority": 9,
+      "keywords": ["血之回声", "血之", "血之回"]
+    },
+    {
+      "name": "锐利成长",
+      "priority": 8,
+      "keywords": ["锐利成长", "锐利成"]
+    },
+    {
+      "name": "锐利得势",
+      "priority": 7,
+      "keywords": ["锐利得势", "锐利得"]
+    },
+    {
+      "name": "洞察星痕",
+      "priority": 6,
+      "keywords": ["洞察星痕", "洞察星"]
+    },
+    {
+      "name": "速度星痕",
+      "priority": 5,
+      "keywords": ["速度星痕", "速度星"]
+    },
+    {
+      "name": "速度天赋",
+      "priority": 4,
+      "keywords": ["速度天赋", "速度天"]
+    },
+    {
+      "name": "暴击天赋",
+      "priority": 3,
+      "keywords": ["暴击天赋", "暴击天"]
+    },
+    {
+      "name": "洞察感知",
+      "priority": 2,
+      "keywords": ["洞察感知", "洞察感"],
+      "multi_level": true,
+      "max_level": 5,
+      "note": "感知类技能, 最多5级"
+    },
+    {
+      "name": "攻击技巧",
+      "priority": 1,
+      "keywords": ["攻击技巧", "攻击技"],
+      "multi_level": true,
+      "max_level": 5,
+      "note": "技巧类技能, 最多5级"
+    }
+  ]
+}

@@ -1,0 +1,1040 @@
+{
+  "_comment": "跑马事件决策数据 - 匹配逻辑：OCR识别选项文字 → 模糊匹配 options 中的 keyword",
+  "_status_说明": "confirmed=有明确推荐, pending=需人工确认, conditional=依赖游戏状态",
+  "_更新方式": "直接编辑本文件即可，脚本启动时自动加载",
+  "move_platform_option_index": 2,
+
+  "events": [
+    {
+      "id": "free_time",
+      "event_name": "闲暇时间",
+      "category": "三月中旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 4,
+      "options": [
+        { "index": 1, "keyword": "一起去吃限定甜点吧", "alias": ["甜点", "限定甜点"] },
+        { "index": 2, "keyword": "一起去看新上映的电影吧", "alias": ["电影", "新上映"] },
+        { "index": 3, "keyword": "我们去露营吧", "alias": ["露营"] },
+        { "index": 4, "keyword": "今天就这样好好休息吧", "alias": ["休息吧", "好好休息"] }
+      ],
+      "note": "选4回体力；选2海报相当于赚4或19点技能点"
+    },
+    {
+      "id": "rescue_supply",
+      "event_name": "拯救集团供应",
+      "category": "三月中旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "让我们选择食物", "alias": ["选择食物", "营养剂", "选营养剂吧", "选营养剂"] },
+        { "index": 2, "keyword": "让我们选择一个蓬松的枕头", "alias": ["蓬松的枕头", "枕头", "选蓬松的枕头吧", "蓬松的枕头吧"] },
+        { "index": 3, "keyword": "让我们选择辛辣食物", "alias": ["辛辣食物", "辛辣", "香辣的食物", "选香辣的食物吧", "香辣食物"] }
+      ],
+      "note": "默认攻击/力量基调选1(力量)，非攻击基调选2(生命)，选3(耐力)"
+    },
+    {
+      "id": "mysterious_statue",
+      "event_name": "神秘石像",
+      "category": "三月中旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "我向剑祈祷", "alias": ["向剑祈祷", "剑祈祷"] },
+        { "index": 2, "keyword": "为鲜花祈祷", "alias": ["鲜花祈祷"] },
+        { "index": 3, "keyword": "我不祈祷", "alias": ["不祈祷"] }
+      ],
+      "note": "攻击选1(力量+20/生命-20)，生存选2(生命+20/力量-20)"
+    },
+    {
+      "id": "reset_routine",
+      "event_name": "蕾塞特例程",
+      "category": "四月下旬（固定事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "我们来帮忙吧", "alias": ["帮忙吧", "去帮忙吧", "来帮忙吧"] },
+        { "index": 2, "keyword": "我们稍等片刻", "alias": ["稍等片刻", "再等一下看看", "等一下看看"] }
+      ],
+      "note": "所有蕾塞特事件都推荐做，选1"
+    },
+    {
+      "id": "unknown_merchant",
+      "event_name": "身份不明的商人",
+      "category": "五月中旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 3,
+      "options": [
+        { "index": 1, "keyword": "有助于攻击的秘术书", "alias": ["攻击的秘术书"] },
+        { "index": 2, "keyword": "有助于生存的秘术书", "alias": ["生存的秘术书"] },
+        { "index": 3, "keyword": "也有在任何情况下都能使用的秘术书吗", "alias": ["任何情况下", "都能使用"] },
+        { "index": 4, "keyword": "什么也不需要", "alias": ["不需要"] }
+      ],
+      "note": "推荐选3速度。选4给命中/命抗折扣"
+    },
+    {
+      "id": "weapon_workshop",
+      "event_name": "武器工坊的营销策略",
+      "category": "五月中旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "花钱购买", "alias": ["花钱"] },
+        { "index": 2, "keyword": "寻找弱点进行攻击", "alias": ["弱点", "攻击"] },
+        { "index": 3, "keyword": "用力量将其拔出", "alias": ["力量", "拔出"] },
+        { "index": 4, "keyword": "直接路过", "alias": ["路过"] }
+      ],
+      "note": "体力没满优先选1回体；心情没满且命中≥70选2；选3不推荐"
+    },
+    {
+      "id": "unexpected_discovery",
+      "event_name": "意外的发现",
+      "category": "五月中旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "虽然需要费点力气", "alias": ["虽然会费点力气", "还是挖一下吧", "挖挖看吧", "费点力气", "会费点力气"] },
+        { "index": 2, "keyword": "没必要在这种地方浪费体力", "alias": ["没有多余体力", "浪费在这种地方", "浪费体力", "没必要"] }
+      ],
+      "note": "一般选1拿10体开赌，道具之后的事件如果触发可以换力量生命防御各+10"
+    },
+    {
+      "id": "experimental_potion",
+      "event_name": "试作强化药剂",
+      "category": "五月中旬/九月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 4,
+      "options": [
+        { "index": 1, "keyword": "不祥地泛着红色的药剂", "alias": ["红色的药剂", "不祥"] },
+        { "index": 2, "keyword": "散发冰冷蓝光的药剂", "alias": ["蓝光的药剂", "冰冷"] },
+        { "index": 3, "keyword": "发出耀眼黄色光芒的药剂", "alias": ["黄色光芒", "耀眼"] },
+        { "index": 4, "keyword": "旁边放着的普通饮料", "alias": ["普通饮料", "旁边放着"] }
+      ],
+      "note": "一般不赌，选4回体力。赌了赢了起飞，输了就准备杀了"
+    },
+    {
+      "id": "hell_training",
+      "event_name": "秘密的地狱特训",
+      "category": "五月中旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "如何打好拳击机", "alias": ["拳击机"] },
+        { "index": 2, "keyword": "如何不疲倦地奔跑", "alias": ["不疲倦", "奔跑"] },
+        { "index": 3, "keyword": "现在还不用", "alias": ["还不用"] }
+      ],
+      "note": "攻击选1(力量)，生存选2(生命)"
+    },
+    {
+      "id": "reset_temptation",
+      "event_name": "蕾塞特的诱惑",
+      "category": "六月下旬（固定事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "干脆买下来吧", "alias": ["买下来"] },
+        { "index": 2, "keyword": "为旅途攒钱", "alias": ["攒钱"] }
+      ],
+      "note": "所有蕾塞特事件都推荐做，选1"
+    },
+    {
+      "id": "maze_exploration",
+      "event_name": "迷宫探索",
+      "category": "七月中旬（固定事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "让我们用钱来解决这个问题", "alias": ["用钱", "解决"] },
+        { "index": 2, "keyword": "如果自己驾驶起重机呢", "alias": ["驾驶", "重机"] },
+        { "index": 3, "keyword": "我需要找条绕路", "alias": ["绕路"] }
+      ],
+      "note": "一般选1花金币回体力"
+    },
+    {
+      "id": "ambush",
+      "event_name": "袭击",
+      "category": "七月下旬（固定事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "让我们利用地形绕过他们", "alias": ["利用地形", "绕过"] },
+        { "index": 2, "keyword": "保持冷静，巩固防御", "alias": ["冷静", "巩固防御"] },
+        { "index": 3, "keyword": "我们逃到楼上去吧", "alias": ["逃到楼上"] }
+      ],
+      "note": "如果想兼顾pvp非常推荐选1拿速度小技能打折。如果心情不满且防御≥175可选2回心情"
+    },
+    {
+      "id": "slime_raid",
+      "event_name": "突袭 - 史莱姆",
+      "category": "八月中旬（随机事件）",
+      "status": "conditional",
+      "recommended_option": 3,
+      "fallback_option": 3,
+      "options": [
+        { "index": 1, "keyword": "我们来清除黏液", "alias": ["清除黏液", "赶走史莱姆", "赶走史莱姆吧"] },
+        { "index": 2, "keyword": "让我们一起协助疏散", "alias": ["协助疏散", "帮忙疏散", "帮忙疏散吧"] },
+        { "index": 3, "keyword": "不要卷入其中", "alias": ["不要卷入", "不要牵扯进去", "不要牵扯进去。"] }
+      ],
+      "note": "当前自动化默认选3跳过；若后续接入命中/命抗判定再恢复条件分支。2选项纯亏"
+    },
+    {
+      "id": "reset_luck",
+      "event_name": "蕾塞特的运气",
+      "category": "九月下旬/一月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "fallback_option": 3,
+      "options": [
+        { "index": 1, "keyword": "将抽奖券放入左侧的盒子中", "alias": ["左侧", "左边", "盒子", "左边的箱子", "左侧的盒子"] },
+        { "index": 2, "keyword": "将抽奖券放入右侧的盒子中", "alias": ["右侧", "右边", "盒子", "右边的箱子", "右侧的盒子"] },
+        { "index": 3, "keyword": "寻找下一个机会", "alias": ["下一个机会", "下次机会", "等待下次机会"] }
+      ],
+      "note": "优先选右(2)；若点2后画面无变化，则重试1次，仍无变化再回退选3"
+    },
+    {
+      "id": "reset_gloom",
+      "event_name": "莉赛特的忧郁",
+      "category": "一月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "fallback_option": 2,
+      "options": [
+        { "index": 1, "keyword": "难道是这个吗？", "alias": ["难道是这个吗", "是这个吗", "这个吗"] },
+        { "index": 2, "keyword": "叫锁匠来吧。", "alias": ["叫锁匠来吧", "锁匠", "叫锁匠"] }
+      ],
+      "note": "优先选1；若点1后画面无变化，则重试1次，仍无变化再回退选2"
+    },
+    {
+      "id": "sect_lost_item",
+      "event_name": "教团的失物",
+      "category": "九月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "赶紧打开吧", "alias": ["打开吧", "赶快打开吧", "赶快打开", "赶紧打开", "赶快", "赶紧"] },
+        { "index": 2, "keyword": "以后再打开吧", "alias": ["以后再打开", "下次再打开吧", "下次再打开", "下次", "以后"] }
+      ],
+      "note": "一般选打开。OCR 实测会把游戏文案读成「赶快/下次」，alias 已覆盖两套读法"
+    },
+    {
+      "id": "sect_proposal",
+      "event_name": "教团的提议",
+      "category": "九月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "将遗物卖给教团", "alias": ["卖给教团", "遗物", "将文物卖给教团", "文物卖给教团"] },
+        { "index": 2, "keyword": "先留着看看", "alias": ["留着看看", "想自己留着", "自己留着"] }
+      ],
+      "note": "一般选择卖了"
+    },
+    {
+      "id": "strength_training_result",
+      "event_name": "力量特训的成果",
+      "category": "九月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "我不会忘记至今所学的内容", "alias": ["不会忘记", "至今所学"] },
+        { "index": 2, "keyword": "还需要更多学习", "alias": ["更多学习"] }
+      ],
+      "note": "五月中旬随机事件触发过才有可能触发，一般选换"
+    },
+    {
+      "id": "life_training_result",
+      "event_name": "生命特训的成果",
+      "category": "九月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "我不会忘记至今所学的内容", "alias": ["不会忘记", "至今所学"] },
+        { "index": 2, "keyword": "还需要更多学习", "alias": ["更多学习"] }
+      ],
+      "note": "一般选换"
+    },
+    {
+      "id": "unexpected_encouragement",
+      "event_name": "意外的鼓励",
+      "category": "九月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 3,
+      "options": [
+        { "index": 1, "keyword": "相信付出就会有成果", "alias": ["相信付出", "成果"] },
+        { "index": 2, "keyword": "再稍微努力一下吧", "alias": ["稍微努力"] },
+        { "index": 3, "keyword": "现在这样已经足够了", "alias": ["已经足够"] }
+      ],
+      "note": "选2给的属性到这个回合亏了。保守选3放弃；想赌选1"
+    },
+    {
+      "id": "future_choice",
+      "event_name": "为了未来的选择",
+      "category": "九月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "先留着看看", "alias": ["古老的沙漏", "留着看看"] },
+        { "index": 2, "keyword": "拒绝", "alias": ["拒绝"] }
+      ],
+      "note": "绝对不能选1！-30速度会让本来能跑过的马跑不过。选2拿技能点"
+    },
+    {
+      "id": "reset_vacation",
+      "event_name": "蕾塞特的假期",
+      "category": "十月下旬（固定事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "我们一起找个地方买吧", "alias": ["一起找个地方", "买吧"] },
+        { "index": 2, "keyword": "请告诉我它的销售地点", "alias": ["销售地点"] }
+      ],
+      "note": "达到命中/命抗条件肯定选1。选不了就选2"
+    },
+    {
+      "id": "volleyball_qualifier",
+      "event_name": "沙滩排球锦标赛预赛",
+      "category": "十一月初（固定事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "利用对手的弱点", "alias": ["对手的弱点", "攻击对手的弱点", "攻击对手", "对手弱点"] },
+        { "index": 2, "keyword": "发挥我们团队的优势", "alias": ["团队的优势", "发挥我方的优势", "我方的优势", "我方优势", "发挥我方"] },
+        { "index": 3, "keyword": "乘势而上", "alias": ["乘势而上", "用气势压倒对方", "气势压倒对方", "气势压倒", "压倒对方"] },
+        { "index": 4, "keyword": "总会有办法解决的", "alias": ["总会有办法", "总会有办法的", "有办法的"] }
+      ],
+      "note": "心情不是最高选1回心情拿技能点。心情满了且达到属性需求选2。3选项千万别选纯亏。游戏新版文案：攻击对手的弱点/发挥我方的优势/用气势压倒对方/总会有办法的"
+    },
+    {
+      "id": "hot_spring_prep",
+      "event_name": "温泉节的准备工作",
+      "category": "十一月初（固定事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "一座可以骑熊的房子", "alias": ["骑熊", "房子"] },
+        { "index": 2, "keyword": "一家提供美味传统美食的餐厅", "alias": ["传统美食", "餐厅"] },
+        { "index": 3, "keyword": "继续住在你现有的住处", "alias": ["现有的住处"] },
+        { "index": 4, "keyword": "两个都不喜欢", "alias": ["都不喜欢"] }
+      ],
+      "note": "心情不是最高选1回心情拿技能点。心情满了选2收益更高。3选项千万别选"
+    },
+    {
+      "id": "weather_tropical",
+      "event_name": "今天的天气 - 热带",
+      "category": "十一月中旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "使用手持小风扇", "alias": ["小风扇", "手持"] },
+        { "index": 2, "keyword": "想办法硬撑过去", "alias": ["硬撑过去"] }
+      ],
+      "note": "有便携风扇选1。没买到就只能选2但会移除所有正面buff"
+    },
+    {
+      "id": "weather_tropical_night",
+      "event_name": "今日天气一热带夜",
+      "category": "天气事件（当前界面 OCR 记录）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "fallback_option": 2,
+      "options": [
+        { "index": 1, "keyword": "使用手持电风扇", "alias": ["手持电风扇", "电风扇"] },
+        { "index": 2, "keyword": "想办法忍耐一下", "alias": ["忍耐一下", "想办法忍耐"] }
+      ],
+      "note": "按当前界面记录：优先选1；若点击后事件画面无变化，则回退选2。"
+    },
+    {
+      "id": "weather_snow",
+      "event_name": "今天的天气 - 大雪",
+      "category": "十一月中旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "使用暖宝宝", "alias": ["暖宝宝"] },
+        { "index": 2, "keyword": "想办法硬撑过去", "alias": ["硬撑过去"] }
+      ],
+      "note": "有暖宝宝选1。没买到就只能选2但会移除所有正面buff"
+    },
+    {
+      "id": "volleyball_semifinal",
+      "event_name": "沙滩排球锦标赛半决赛",
+      "category": "十一月下旬（固定事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "我们应该先填饱肚子吗", "alias": ["填饱肚子"] },
+        { "index": 2, "keyword": "深呼吸放松", "alias": ["深呼吸", "放松"] },
+        { "index": 3, "keyword": "一如既往，让我们尽力而为", "alias": ["一如既往", "尽力而为"] }
+      ],
+      "note": "除非前一回合休息满体力，不然强力推荐选1花金币回体"
+    },
+    {
+      "id": "holiday_visitor",
+      "event_name": "节日里的不速之客",
+      "category": "十一月下旬（固定事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "提供经济援助", "alias": ["经济援助"] },
+        { "index": 2, "keyword": "自己动手试试", "alias": ["自己动手"] },
+        { "index": 3, "keyword": "放弃", "alias": ["放弃"] }
+      ],
+      "note": "强力推荐选1花金币回体"
+    },
+    {
+      "id": "looter_raid",
+      "event_name": "突袭 - 掠夺者",
+      "category": "十二月中旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "我们来试一试", "alias": ["试一试"] },
+        { "index": 2, "keyword": "我们来谈谈吧", "alias": ["谈谈吧"] },
+        { "index": 3, "keyword": "这是一具普通的尸体", "alias": ["普通的尸体"] }
+      ],
+      "note": "无脑选1。要不就选3放弃"
+    },
+    {
+      "id": "knight_raid",
+      "event_name": "突袭 - 强盗骑士",
+      "category": "十二月中旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "让我们孵化它吧", "alias": ["孵化"] },
+        { "index": 2, "keyword": "我期待未来与您合作", "alias": ["未来", "合作"] },
+        { "index": 3, "keyword": "作战撤退", "alias": ["撤退"] }
+      ],
+      "note": "无脑选1。要不就选3放弃"
+    },
+    {
+      "id": "reset_melancholy",
+      "event_name": "蕾塞特的优郁",
+      "category": "一月下旬（固定事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "就这些吗", "alias": ["就这些"] },
+        { "index": 2, "keyword": "打电话给技术人员", "alias": ["技术人员"] }
+      ],
+      "note": "所有蕾塞特事件都推荐做"
+    },
+    {
+      "id": "new_dept",
+      "event_name": "新设部门努力中！",
+      "category": "一月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "问卷评价：良好", "alias": ["良好", "好", "评价"] },
+        { "index": 2, "keyword": "问卷评价：普通", "alias": ["普通", "一般", "评价"] },
+        { "index": 3, "keyword": "问卷评价：不佳", "alias": ["不佳", "差", "评价"] },
+        { "index": 4, "keyword": "今天有点", "alias": ["今天有点", "有点", "就算了"] }
+      ],
+      "note": "选1(良好)。OCR实测: 良好/普通/不佳/今天有点.."
+    },
+    {
+      "id": "sword_power",
+      "event_name": "刀中隐藏的力量",
+      "category": "一月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "拿起石像的剑", "alias": ["石像的剑", "拾起石像之剑", "石像之剑", "拾起", "拿起"] },
+        { "index": 2, "keyword": "就这样放着不管", "alias": ["放着不管", "维持原状不动", "维持原状", "维持不动", "原状不动"] }
+      ],
+      "note": "一般选1，就算失败了也能接受"
+    },
+    {
+      "id": "flower_power",
+      "event_name": "花中隐藏的力量",
+      "category": "一月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "拿起石像的花", "alias": ["石像的花", "拾起石像之花", "石像之花", "拾起", "拿起"] },
+        { "index": 2, "keyword": "就这样放着不管", "alias": ["放着不管", "维持原状不动", "维持原状", "维持不动", "原状不动"] }
+      ],
+      "note": "一般选1，就算失败了也能接受"
+    },
+    {
+      "id": "sword_in_stone_power",
+      "event_name": "剑中隐藏的力量",
+      "category": "一月下旬（随机事件 - 与刀/花中隐藏的力量同一系列变体）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "拾起石像之花", "alias": ["石像之花", "拾起石像", "拾起", "拿起石像的花", "石像的花"] },
+        { "index": 2, "keyword": "维持原状不动", "alias": ["维持原状", "维持不动", "原状不动", "就这样放着不管", "放着不管"] }
+      ],
+      "note": "X中隐藏的力量系列变体（刀/花/剑），一般选1，就算失败了也能接受"
+    },
+    {
+      "id": "final_potion",
+      "event_name": "完成型强化剂?",
+      "category": "一月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "都到这一步了，喝下去吧", "alias": ["喝下去"] },
+        { "index": 2, "keyword": "还是喝普通饮料吧", "alias": ["普通饮料"] }
+      ],
+      "note": "都跑到这个回合快结束了推荐选2回体稳健。想赌的人可以选1"
+    },
+    {
+      "id": "collector",
+      "event_name": "收藏家来了",
+      "category": "一月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "同意交换", "alias": ["同意", "交换"] },
+        { "index": 2, "keyword": "不想进行交易", "alias": ["不想", "交易"] }
+      ],
+      "note": "如果前面买了海报就选1交换，相当于白赚50旧硬币(25技能点)"
+    },
+    {
+      "id": "simple_test",
+      "event_name": "简单测试",
+      "category": "一月下旬（随机事件）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "用适当的力量施加冲击", "alias": ["适当的力量", "冲击"] },
+        { "index": 2, "keyword": "发动强力攻击", "alias": ["强力攻击"] },
+        { "index": 3, "keyword": "还是好好保存遗物吧", "alias": ["保存遗物"] }
+      ],
+      "note": "一般选1开赌，就算失败了代价也可以接受"
+    },
+    {
+      "id": "weather_sunny",
+      "event_name": "今日天气·晴朗",
+      "category": "天气事件（五月底/七月中旬/九月底/十一月中旬随机）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "悠闲地度过时光", "alias": ["悠闲", "度过时光"] },
+        { "index": 2, "keyword": "按照原计划度过时间", "alias": ["原计划"] }
+      ],
+      "note": "一般选1赌回体。不想减心情的可选2"
+    },
+    {
+      "id": "weather_thunder",
+      "event_name": "今日天气·雷雨",
+      "category": "天气事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "继续训练", "alias": ["继续训练"] },
+        { "index": 2, "keyword": "回旅馆休息", "alias": ["回旅馆", "休息"] }
+      ],
+      "note": "推荐选1继续训练，技能点重要"
+    },
+    {
+      "id": "weather_fog",
+      "event_name": "今日天气·大雾",
+      "category": "天气事件",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "继续训练", "alias": ["继续训练"] },
+        { "index": 2, "keyword": "回旅馆休息", "alias": ["回旅馆", "休息"] }
+      ],
+      "note": "无脑选2回10体即可"
+    },
+    {
+      "id": "training_failure",
+      "event_name": "训练失败",
+      "category": "训练失败后出现",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "今天就先休息吧", "alias": ["先休息", "休息吧", "今天训练到此为止", "训练到此为止", "到此为止"] },
+        { "index": 2, "keyword": "安全地进行训练", "alias": ["安全地", "再试一次吧", "再试一次"] },
+        { "index": 3, "keyword": "递上活力药水", "alias": ["活力药水", "递给她活力药水", "递给活力药水"] }
+      ],
+      "note": "一般选1(休息)回体力最安全；选2(再试)失败率仍高；选3(药水)消耗活力药水"
+    },
+    {
+      "id": "training_direction",
+      "event_name": "训练的方向性",
+      "category": "三月上旬（固定事件）",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "对攻击有帮助的训练教材", "alias": ["攻击", "训练教材", "攻击有帮助"] },
+        { "index": 2, "keyword": "对生存有帮助的训练教材", "alias": ["生存", "训练教材", "生存有帮助"] },
+        { "index": 3, "keyword": "有助于应对各种状况的训练教材", "alias": ["各种状况", "训练教材", "应对各种"] }
+      ],
+      "note": "攻击选1(力量教材)，生存选2(生存教材)"
+    },
+    {
+      "id": "careless_scarlet",
+      "event_name": "切勿大意",
+      "category": "支援卡事件（一分耕耘，一分收获）",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "呼唤逃走的夏尔", "alias": ["叫住跑走", "逃走的夏尔"] },
+        { "index": 2, "keyword": "等待夏尔回来", "alias": ["等待夏尔"] }
+      ],
+      "note": "选2获技能点+45和速度技巧10%折扣，收益远高于选1的力量+10"
+    },
+    {
+      "id": "spread_wings",
+      "event_name": "展开双翼",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "我会为你加油的，斯卡蕾特", "alias": ["为你加油", "斯卡蕾特", "很期待"] },
+        { "index": 2, "keyword": "危险，斯卡蕾特", "alias": ["危险", "斯卡蕾特"] }
+      ],
+      "note": "选1安全(力量+10)。选2体力+15但有debuff"
+    },
+    {
+      "id": "tasting_side",
+      "event_name": "成为被\"品尝\"的一方",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "为斯卡蕾特加油", "alias": ["斯卡蕾特加油"] },
+        { "index": 2, "keyword": "为夏尔加油", "alias": ["夏尔加油"] }
+      ],
+      "note": "选1力量+15+攻击技巧折扣。选2体力+20但有debuff"
+    },
+    {
+      "id": "popular_outfit",
+      "event_name": "成为人气的装束",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "要不要一起去说服一下", "alias": ["一起去说服"] },
+        { "index": 2, "keyword": "或许一个人更轻松", "alias": ["一个人更轻松"] }
+      ],
+      "note": "选1获专属技能和力量+20。选2体力+10+攻击天赋折扣"
+    },
+    {
+      "id": "fresh_convenience",
+      "event_name": "新鲜特供便利屋",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "赞同弗雷的意见", "alias": ["弗雷的意见"] },
+        { "index": 2, "keyword": "赞同特莉丝的意见", "alias": ["特莉丝的意见"] }
+      ],
+      "note": "选1力量+18+技能点+20。选2力量+8+攻击天赋折扣"
+    },
+    {
+      "id": "dark_past_choice",
+      "event_name": "黑暗的过去",
+      "category": "支援卡事件（有选项版本）",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "预测弗雷获胜", "alias": ["弗雷获胜", "预测芙蕾会获胜", "预测芙蕾获胜", "芙蕾获胜", "芙蕾"] },
+        { "index": 2, "keyword": "预测露娜获胜", "alias": ["露娜获胜", "露娜", "预测露娜会获胜"] }
+      ],
+      "note": "当前策略改为选2。选1获坚固破坏潜力+力量加成，选2获生命/防御加成"
+    },
+    {
+      "id": "world_not_gentle",
+      "event_name": "世事并不如想象般温柔",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "换点别的事情做吧", "alias": ["换点别的"] },
+        { "index": 2, "keyword": "吃点好吃的，把一切忘掉吧", "alias": ["吃点好吃", "忘掉吧"] }
+      ],
+      "note": "选2心情+1+技能点+10收益更好"
+    },
+    {
+      "id": "serious_workaholic",
+      "event_name": "严重的工作狂",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "要不要试着重现当时的生活节奏", "alias": ["重现", "生活节奏"] },
+        { "index": 2, "keyword": "不如好好彻底休息一下吧", "alias": ["彻底休息"] }
+      ],
+      "note": "选1获技能点+40。选2获破坏技巧折扣"
+    },
+    {
+      "id": "first_love_story",
+      "event_name": "初恋的故事",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "给孩子们讲他们喜欢的故事吧", "alias": ["孩子们", "故事吧"] },
+        { "index": 2, "keyword": "干脆利落地继续上课", "alias": ["继续上课"] }
+      ],
+      "note": "选1防御+15。选2有debuff但给防御感觉折扣"
+    },
+    {
+      "id": "irresponsible_heart",
+      "event_name": "无法承担责任的童心",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "接受琳准备的东西", "alias": ["接受琳准备", "琳准备"] },
+        { "index": 2, "keyword": "指向地上滚落的人偶", "alias": ["人偶", "滚落"] }
+      ],
+      "note": "选1成功收益高（防御+20+buff）。选2回体力+心情"
+    },
+    {
+      "id": "training_combat",
+      "event_name": "训练如临实战",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "装病", "alias": ["装病"] },
+        { "index": 2, "keyword": "随便糊弄过去", "alias": ["糊弄过去"] }
+      ],
+      "note": "选1防御+25+技能点+20+专属技能。选2也有专属技能但属性更少"
+    },
+    {
+      "id": "blue_boutique",
+      "event_name": "蓝之精品店",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "按她所愿行事", "alias": ["按她所愿"] },
+        { "index": 2, "keyword": "守住尊严", "alias": ["守住尊严"] }
+      ],
+      "note": "选2技能点+20。选1防御+15但体力-10"
+    },
+    {
+      "id": "mutant_rabbit_trap",
+      "event_name": "变种兔的陷阱",
+      "category": "支援卡事件",
+      "status": "pending",
+      "recommended_option": null,
+      "options": [
+        { "index": 1, "keyword": "等等，克拉丽莎", "alias": ["等等", "克拉丽莎"] },
+        { "index": 2, "keyword": "听说有会模仿兔子的魔物在游荡", "alias": ["模仿兔子", "魔物"] }
+      ],
+      "note": "需人工确认。选1回体力+防御，选2回心情+防御"
+    },
+    {
+      "id": "void_body",
+      "event_name": "令人堕落的空虚体",
+      "category": "支援卡事件",
+      "status": "pending",
+      "recommended_option": null,
+      "options": [
+        { "index": 1, "keyword": "那种东西不可能存在", "alias": ["不可能存在"] },
+        { "index": 2, "keyword": "哇，真是可怕的故事", "alias": ["可怕的故事"] }
+      ],
+      "note": "选1获防御感觉20%折扣。选2回体力+心情。需人工确认"
+    },
+    {
+      "id": "donut_reasoning",
+      "event_name": "甜甜圈推理",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "莉莉没有错", "alias": ["莉莉", "没有错"] },
+        { "index": 2, "keyword": "果然还是有点过分了", "alias": ["过分了"] }
+      ],
+      "note": "选1获buff鉴别眼（训练获得命中增加）。选2扣体力+命中技巧折扣"
+    },
+    {
+      "id": "soup_for_who",
+      "event_name": "这碗汤，是为谁而做",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "那就给我来一杯吧", "alias": ["给我来一杯"] },
+        { "index": 2, "keyword": "我觉得做给普通人喝就够了", "alias": ["普通人喝", "就够了"] }
+      ],
+      "note": "选1获buff自信（全训练失败率下降）。选2心情+1"
+    },
+    {
+      "id": "experienced",
+      "event_name": "处世老练",
+      "category": "支援卡事件",
+      "status": "pending",
+      "recommended_option": null,
+      "options": [
+        { "index": 1, "keyword": "明白了，我会尽量写得\"特别一点\"", "alias": ["特别一点"] },
+        { "index": 2, "keyword": "其实我有更好的想法", "alias": ["更好的想法"] }
+      ],
+      "note": "选1防御+8/命抗+12，选2命抗+10/心情+1。需人工确认"
+    },
+    {
+      "id": "safe_driving",
+      "event_name": "请安全驾驶！",
+      "category": "支援卡事件",
+      "status": "pending",
+      "recommended_option": null,
+      "options": [
+        { "index": 1, "keyword": "要不要问问发生了什么", "alias": ["问问发生了什么"] },
+        { "index": 2, "keyword": "看起来很忙，还是不要打扰了", "alias": ["不要打扰"] }
+      ],
+      "note": "两个选项都给专属技能，效果一样。选1心情+1，选2体力+15"
+    },
+    {
+      "id": "escape_or_accept",
+      "event_name": "想进来随你，但……",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "逃离", "alias": ["逃离"] },
+        { "index": 2, "keyword": "接受命运", "alias": ["接受命运"] }
+      ],
+      "note": "选1力量+12/命中+8+专属技能。选2力量+5+专属技能"
+    },
+    {
+      "id": "omega_hand",
+      "event_name": "欧米伽之手",
+      "category": "支援卡事件",
+      "status": "pending",
+      "recommended_option": null,
+      "options": [
+        { "index": 1, "keyword": "静观其变", "alias": ["静观其变"] },
+        { "index": 2, "keyword": "阻止欧米伽", "alias": ["阻止欧米伽"] }
+      ],
+      "note": "两选项属性一样(力量+12/命中+8/技能点+30+叠加触发)。选2额外给状态+1。需人工确认"
+    },
+    {
+      "id": "thing_value",
+      "event_name": "万物之价值",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "稍等一下，我先确认一下", "alias": ["稍等", "确认一下"] },
+        { "index": 2, "keyword": "有没有混入什么奇怪的东西", "alias": ["奇怪的东西"] }
+      ],
+      "note": "选1体力-10但命抗+25，选2命抗+10/技能点+15"
+    },
+    {
+      "id": "stripe",
+      "event_name": "条纹",
+      "category": "支援卡事件",
+      "status": "pending",
+      "recommended_option": null,
+      "options": [
+        { "index": 1, "keyword": "我觉得贝尔的石头更漂亮", "alias": ["贝尔的石头"] },
+        { "index": 2, "keyword": "一起去找出来吧", "alias": ["找出来吧"] }
+      ],
+      "note": "两选项都给命中技巧折扣+命中增加4%。需人工确认"
+    },
+    {
+      "id": "proud_duel",
+      "event_name": "高傲二人的对决",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "危险的咒术，你不会用吧", "alias": ["危险的咒术", "不会用吧"] },
+        { "index": 2, "keyword": "贝尔·里斯，把药交给我，快跑", "alias": ["把药交给我", "快跑"] }
+      ],
+      "note": "选1力量+10/命中+15/技能点+22+弓专属技能。选2体力+20"
+    },
+    {
+      "id": "from_darkness",
+      "event_name": "自黑暗而生，向光明立誓",
+      "category": "支援卡事件",
+      "status": "pending",
+      "recommended_option": null,
+      "options": [
+        { "index": 1, "keyword": "那种事无关紧要！获得力量+5、生命+5、防御+5", "alias": ["力量+5", "生命+5", "防御+5"] },
+        { "index": 2, "keyword": "那种事无关紧要！获得体力+5、技能点+5", "alias": ["体力+5", "技能点+5"] }
+      ],
+      "note": "选1属性多，选2回体+技能点。需人工确认"
+    },
+    {
+      "id": "representative_trouble",
+      "event_name": "代表的烦恼",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "沾着露水的玫瑰色", "alias": ["玫瑰色", "露水"] },
+        { "index": 2, "keyword": "水润的葡萄柚般橙色", "alias": ["葡萄柚", "橙色"] }
+      ],
+      "note": "选1属性更高(力量+5/生命+5/命中+12/体力-10+攻击感觉折扣)。选2回体力+10"
+    },
+    {
+      "id": "species_evolution",
+      "event_name": "物种的进化",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "试着小心地抚摸它的头", "alias": ["抚摸它的头", "小心地"] },
+        { "index": 2, "keyword": "就是现在！像阿塞拉那样去摸肚子", "alias": ["摸肚子", "阿塞拉"] }
+      ],
+      "note": "选1成功收益高(命中+8/命抗+5/心情+1)。选2稳定但收益低"
+    },
+    {
+      "id": "precious_thing",
+      "event_name": "对某人而言弥足珍贵之物",
+      "category": "支援卡事件",
+      "status": "pending",
+      "recommended_option": null,
+      "options": [
+        { "index": 1, "keyword": "翻开那本书", "alias": ["翻开", "那本书"] },
+        { "index": 2, "keyword": "让给贝斯塔", "alias": ["让给贝斯塔"] }
+      ],
+      "note": "选1体力+10。选2成功收益高但有风险。需人工确认"
+    },
+    {
+      "id": "besta_tactics",
+      "event_name": "贝斯塔的战术说明",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "阻止贝斯塔", "alias": ["阻止贝斯塔"] },
+        { "index": 2, "keyword": "静观其变", "alias": ["静观其变"] }
+      ],
+      "note": "选1成功收益更高。选2稳定但属性少"
+    },
+    {
+      "id": "rabbit_truth",
+      "event_name": "兔子旁边的兔子旁边的兔子",
+      "category": "支援卡事件",
+      "status": "pending",
+      "recommended_option": null,
+      "options": [
+        { "index": 1, "keyword": "坦白说出真相", "alias": ["坦白", "真相"] },
+        { "index": 2, "keyword": "含糊带过", "alias": ["含糊带过"] }
+      ],
+      "note": "选1成功收益高(锋利成长技能)但有风险。选2稳定给生命天赋折扣。需人工确认"
+    },
+    {
+      "id": "experienced_talk",
+      "event_name": "皆为亲历之谈",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "坦白说出真相", "alias": ["坦白", "真相"] }
+      ],
+      "note": "只有一个选项(坦白说出真相)，获生命+12/防御+8+专属技能"
+    },
+    {
+      "id": "companion_trace",
+      "event_name": "同伴的痕迹",
+      "category": "支援卡事件",
+      "status": "pending",
+      "recommended_option": null,
+      "options": [
+        { "index": 1, "keyword": "如果是有意义的东西，我会帮你买下", "alias": ["帮你买下", "有意义"] },
+        { "index": 2, "keyword": "与其日后后悔，不如顺从内心而行", "alias": ["顺从内心"] }
+      ],
+      "note": "两选项都给卡门专属从容应对。需人工确认"
+    },
+    {
+      "id": "tasted_side_v2",
+      "event_name": "成为被\"品尝\"的一方",
+      "category": "支援卡事件（另一版本）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "为斯卡蕾特加油", "alias": ["斯卡蕾特加油"] },
+        { "index": 2, "keyword": "为夏尔加油", "alias": ["夏尔加油"] }
+      ],
+      "note": "选1生命+12/技能点+15。选2生命+3/心情-1但给共感能力永久旅状态"
+    },
+    {
+      "id": "not_needed",
+      "event_name": "不需要！",
+      "category": "支援卡事件",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "按她所愿行事", "alias": ["按她所愿"] }
+      ],
+      "note": "只有一个有效选项，防御+12"
+    },
+    {
+      "id": "companion_purchase_choice",
+      "event_name": "同伴购买抉择",
+      "category": "支援卡事件（OCR兜底）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "代为购买", "alias": ["代为购买。", "帮忙购买", "替她购买"] },
+        { "index": 2, "keyword": "为了旅程省下", "alias": ["旅程省下", "省下", "不买"] }
+      ],
+      "note": "当前策略固定选1。若后续实测收益变化再调整。"
+    },
+    {
+      "id": "find_shop_direction_help",
+      "event_name": "帮忙找卖的地方",
+      "category": "随机事件（OCR兜底）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "一起帮忙找卖的地方", "alias": ["一起帮忙找", "帮忙找卖的地方", "找卖的地方"] },
+        { "index": 2, "keyword": "告诉她卖的地方的位置", "alias": ["告诉她卖的地方", "卖的地方的位置", "告诉她位置"] }
+      ],
+      "note": "按你的要求固定选1。若后续确认事件正式名称再补充 event_name。"
+    },
+    {
+      "id": "sudden_looter_encounter",
+      "event_name": "突发遭遇一掠夺者",
+      "category": "十二月中旬（当前界面 OCR 记录）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "options": [
+        { "index": 1, "keyword": "给他们点颜色瞧瞧！", "alias": ["点颜色瞧瞧", "给他们点颜色"] },
+        { "index": 2, "keyword": "用言语说服他们。", "alias": ["言语说服", "说服他们"] },
+        { "index": 3, "keyword": "装死算了。", "alias": ["装死", "算了"] }
+      ],
+      "note": "按当前现场登记，固定选1。"
+    },
+    {
+      "id": "relax_or_stick_to_plan",
+      "event_name": "悠闲时光还是按计划",
+      "category": "旅程事件（标题被时间轴遮挡，OCR兜底）",
+      "status": "confirmed",
+      "recommended_option": 1,
+      "fallback_option": 2,
+      "options": [
+        { "index": 1, "keyword": "度过一段悠闲的时光。", "alias": ["悠闲的时光", "度过一段悠闲", "悠闲时光"] },
+        { "index": 2, "keyword": "按照原定计划度过时间。", "alias": ["按照原定计划", "原定计划", "按计划度过时间"] }
+      ],
+      "note": "当前现场确认优先选1；若点1后画面无变化，则重试1次，仍无变化再回退选2。标题OCR为“07月中旬”时间轴噪声，靠选项关键词命中。"
+    },
+    {
+      "id": "nothing_in_world_is_easy",
+      "event_name": "世上没有容易的事",
+      "category": "旅程事件（标题被时间轴遮挡，OCR兜底）",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "换个工作试试吧！", "alias": ["换个工作", "换工作", "试试吧"] },
+        { "index": 2, "keyword": "吃点好吃的忘掉吧。", "alias": ["吃点好吃的", "好吃的忘掉", "忘掉吧"] }
+      ],
+      "option_y_overrides": [0.651, 0.718],
+      "note": "现场登记：固定选2(吃点好吃的忘掉吧)。Y 由 --probe-event-y 行级 OCR 实测得：选项1 Y=0.651, 选项2 Y=0.718（截图 cli_test_20260420_142934.png）。标题OCR为“04月上旬”时间轴噪声，靠选项关键词命中。"
+    },
+    {
+      "id": "arkna_value_of_everything",
+      "event_name": "万物的价值",
+      "category": "06月上旬（当前截图登记）",
+      "status": "confirmed",
+      "recommended_option": 2,
+      "options": [
+        { "index": 1, "keyword": "等等，我先确认看看。", "alias": ["等等", "先确认看看", "确认看看"] },
+        { "index": 2, "keyword": "里面该不会有奇怪的东西吧？", "alias": ["奇怪的东西", "里面该不会", "该不会有奇怪"] }
+      ],
+      "option_y_overrides": [0.650, 0.719],
+      "note": "现场登记：2026-05-01 19:27:18 +08:00；截图 20260501_192718_manual.png；按用户要求默认选2。标题为阿尔克那事件“万物的价值”，当前时间为06月上旬。"
+    }
+  ]
+}
