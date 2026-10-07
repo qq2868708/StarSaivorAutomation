@@ -11,6 +11,7 @@ import os
 import subprocess
 import sys
 import threading
+import uuid
 import webbrowser
 from datetime import datetime
 from pathlib import Path
@@ -356,6 +357,66 @@ def events(query: str = Query(default="")) -> dict[str, Any]:
     return {"total": len(store.events), "items": store.event_rows(query)}
 
 
+@app.post("/api/events")
+def create_event(body: dict[str, Any]) -> dict[str, Any]:
+    """Create a local rule from the event editor.
+
+    Manually entered events are deliberately marked as local rules.  They can
+    be used in development mode after their option text and effects are
+    filled in, but are never presented as document-verified data.
+    """
+    store.reload()
+    event_name = str(body.get("event_name") or "").strip()
+    if not event_name:
+        raise HTTPException(400, "事件名不能为空")
+    raw_options = body.get("options", [])
+    if not isinstance(raw_options, list):
+        raise HTTPException(400, "options 必须是数组")
+    options: list[dict[str, Any]] = []
+    for position, raw_option in enumerate(raw_options, start=1):
+        if not isinstance(raw_option, dict):
+            raise HTTPException(400, f"分支{position}格式无效")
+        try:
+            option_index = int(raw_option.get("index", position))
+        except (TypeError, ValueError):
+            raise HTTPException(400, f"分支{position}序号必须是整数")
+        if option_index < 1:
+            raise HTTPException(400, f"分支{position}序号必须是正整数")
+        aliases = raw_option.get("alias", [])
+        if isinstance(aliases, str):
+            aliases = [item.strip() for item in aliases.split(",") if item.strip()]
+        if not isinstance(aliases, list):
+            raise HTTPException(400, f"分支{position}别名格式无效")
+        options.append({
+            "index": option_index,
+            "keyword": str(raw_option.get("keyword") or "").strip(),
+            "alias": [str(item).strip() for item in aliases if str(item).strip()],
+            "effect_text": str(raw_option.get("effect_text") or "").strip(),
+        })
+    try:
+        recommended = int(body.get("recommended_option", 1))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "默认分支必须是整数")
+    if recommended < 1 or (options and recommended > len(options)):
+        raise HTTPException(400, "默认分支超出当前分支数量")
+    event = {
+        "id": f"manual_{uuid.uuid4().hex[:12]}",
+        "event_name": event_name,
+        "title_aliases": [event_name],
+        "category": str(body.get("category") or "手动事件").strip(),
+        "source_sheet": "手动维护",
+        "source_type": "local_rule",
+        "document_verified": False,
+        "status": "manual",
+        "recommended_option": recommended,
+        "note": "手动维护事件；效果需要自行填写并在开发模式验证。",
+        "options": options,
+    }
+    store.events.append(event)
+    store.save_events()
+    return {"ok": True, "index": len(store.events) - 1, "event": event}
+
+
 @app.get("/api/events/{index}")
 def event_detail(index: int) -> dict[str, Any]:
     store.reload()
@@ -380,7 +441,7 @@ def update_event(index: int, body: dict[str, Any]) -> dict[str, Any]:
     try:
         body["recommended_option"] = int(body.get("recommended_option", 1))
     except (TypeError, ValueError):
-        raise HTTPException(400, "推荐分支必须是整数")
+        raise HTTPException(400, "默认分支必须是整数")
     original = store.events[index]
     # Keep the event identity and source metadata intact while allowing the
     # browser to edit the visible name, recommendation, and branch records.

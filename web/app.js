@@ -5,6 +5,7 @@ const state = {
   currentEventIndex: null,
   currentEvent: null,
   selectedBranch: null,
+  isNewEvent: false,
   activeTab: "run",
 };
 
@@ -188,19 +189,41 @@ function renderEvents(items, total) {
   state.totalEvents = total;
   $("eventCount").textContent = `${items.length} / ${total}`;
   const rows = $("eventRows");
+  removeInlineEditor();
   if (!items.length) {
     rows.innerHTML = '<tr><td colspan="6" class="empty-cell">没有匹配的事件</td></tr>';
+    if (state.isNewEvent) {
+      ensureInlineEditor(null);
+      populateEventEditor(state.currentEvent, state.currentEvent.options || []);
+    }
     return;
   }
   rows.innerHTML = items.map((event) => `
-    <tr data-event-index="${event.index}" class="${event.index === state.currentEventIndex ? "active" : ""}">
+    <tr data-event-index="${event.index}" class="${event.index === state.currentEventIndex ? "active" : ""}" title="单击展开编辑，双击聚焦事件名">
       <td title="${esc(event.name)}">${esc(event.name)}</td>
       <td>${esc(event.category)}</td><td>${esc(event.source)}</td>
       <td>${esc(event.verified)}</td><td>${esc(event.recommended)}</td><td>${esc(event.options)}</td>
     </tr>`).join("");
   rows.querySelectorAll("tr[data-event-index]").forEach((row) => {
-    row.addEventListener("click", () => loadEvent(Number(row.dataset.eventIndex)));
+    row.addEventListener("click", () => {
+      const index = Number(row.dataset.eventIndex);
+      if (index === state.currentEventIndex && !state.isNewEvent && document.querySelector("[data-inline-editor]")) {
+        collapseInlineEditor();
+      } else {
+        loadEvent(index);
+      }
+    });
+    row.addEventListener("dblclick", () => {
+      loadEvent(Number(row.dataset.eventIndex)).then(() => $("eventName").focus());
+    });
   });
+  if (state.isNewEvent) {
+    ensureInlineEditor(null);
+    populateEventEditor(state.currentEvent, state.currentEvent.options || []);
+  } else if (state.currentEventIndex !== null && state.currentEvent) {
+    ensureInlineEditor(state.currentEventIndex);
+    populateEventEditor(state.currentEvent, state.currentEvent.options || []);
+  }
 }
 
 async function loadEvents() {
@@ -217,18 +240,69 @@ async function loadEvent(index) {
     const data = await api(`/api/events/${index}`);
     state.currentEventIndex = index;
     state.currentEvent = structuredClone(data.event);
+    state.isNewEvent = false;
     state.selectedBranch = null;
-    $("eventEmpty").hidden = true;
-    $("eventEditor").hidden = false;
-    $("eventName").value = data.event.event_name || data.event.id || "";
-    $("eventRecommended").value = data.event.recommended_option ?? "";
-    $("eventEditorHint").textContent = `${data.event.id || "未命名"} · ${data.event.options?.length || 0} 个分支`;
-    $("eventSourceBadge").textContent = data.event.document_verified ? "文档核验" : "本地规则";
-    $("eventSourceBadge").classList.toggle("ready", Boolean(data.event.document_verified));
-    renderBranches(data.options || data.event.options || []);
+    ensureInlineEditor(index);
+    populateEventEditor(data.event, data.options || data.event.options || []);
     document.querySelectorAll("#eventRows tr[data-event-index]").forEach((row) =>
       row.classList.toggle("active", Number(row.dataset.eventIndex) === index));
   } catch (error) { showToast(`读取事件失败：${error.message}`, true); }
+}
+
+function removeInlineEditor() {
+  document.querySelector("[data-inline-editor]")?.remove();
+}
+
+function collapseInlineEditor() {
+  removeInlineEditor();
+  state.currentEventIndex = null;
+  state.currentEvent = null;
+  state.selectedBranch = null;
+  document.querySelectorAll("#eventRows tr[data-event-index]").forEach((row) => row.classList.remove("active"));
+}
+
+function ensureInlineEditor(index) {
+  removeInlineEditor();
+  const template = $("eventEditorTemplate");
+  const rows = $("eventRows");
+  if (!template || !rows) return false;
+  const fragment = template.content.cloneNode(true);
+  const target = index === null ? null : rows.querySelector(`tr[data-event-index="${index}"]`);
+  if (target) target.after(fragment);
+  else rows.prepend(fragment);
+  return true;
+}
+
+function populateEventEditor(event, options) {
+  if (!$("eventEditor")) return;
+  $("eventName").value = event.event_name || event.id || "";
+  $("eventCategory").value = event.category || "";
+  $("eventRecommended").value = event.recommended_option ?? "";
+  $("eventEditorHint").textContent = `${event.id || "新事件"} · ${options.length} 个分支`;
+  $("eventSourceBadge").textContent = event.document_verified ? "文档核验" : (event.status === "manual" ? "手动新增" : "本地规则");
+  $("eventSourceBadge").classList.toggle("ready", Boolean(event.document_verified));
+  renderBranches(options);
+  if (state.selectedBranch !== null && options[state.selectedBranch]) selectBranch(state.selectedBranch);
+}
+
+function prepareNewEvent() {
+  removeInlineEditor();
+  state.currentEventIndex = null;
+  state.currentEvent = {
+    id: "",
+    event_name: "",
+    category: "手动事件",
+    source_type: "local_rule",
+    document_verified: false,
+    recommended_option: 1,
+    options: [{ index: 1, keyword: "", alias: [], effect_text: "" }],
+  };
+  state.isNewEvent = true;
+  state.selectedBranch = 0;
+  ensureInlineEditor(null);
+  populateEventEditor(state.currentEvent, state.currentEvent.options);
+  selectBranch(0);
+  $("eventName").focus();
 }
 
 function renderBranches(options) {
@@ -293,16 +367,28 @@ function deleteBranch() {
 }
 
 async function saveEvent() {
-  if (state.currentEventIndex === null || !state.currentEvent) { showToast("请先选择一个事件", true); return; }
-  state.currentEvent.event_name = $("eventName").value.trim();
-  state.currentEvent.recommended_option = Number($("eventRecommended").value);
+  if (!state.currentEvent) { showToast("请先选择一个事件", true); return; }
+  const eventName = $("eventName").value.trim();
+  if (!eventName) { showToast("事件名不能为空", true); $("eventName").focus(); return; }
+  const recommended = Number($("eventRecommended").value);
+  if (!Number.isInteger(recommended) || recommended < 1 ||
+      ((state.currentEvent.options || []).length && recommended > state.currentEvent.options.length)) {
+    showToast("默认分支必须是当前分支中的正整数", true); return;
+  }
+  state.currentEvent.event_name = eventName;
+  state.currentEvent.category = $("eventCategory").value.trim() || "手动事件";
+  state.currentEvent.recommended_option = recommended;
   try {
-    await api(`/api/events/${state.currentEventIndex}`, {
-      method: "PUT", headers: { "Content-Type": "application/json" },
+    const endpoint = state.isNewEvent ? "/api/events" : `/api/events/${state.currentEventIndex}`;
+    const method = state.isNewEvent ? "POST" : "PUT";
+    const data = await api(endpoint, {
+      method, headers: { "Content-Type": "application/json" },
       body: JSON.stringify(state.currentEvent),
     });
-    showToast("事件已保存到 document_verified.json");
+    showToast(state.isNewEvent ? "新事件已添加到事件库" : "事件已保存到 document_verified.json");
+    state.isNewEvent = false;
     await loadEvents();
+    state.currentEventIndex = data.index ?? state.currentEventIndex;
     await loadEvent(state.currentEventIndex);
   } catch (error) { showToast(`保存事件失败：${error.message}`, true); }
 }
@@ -346,6 +432,7 @@ document.querySelectorAll(".nav-item").forEach((button) => button.addEventListen
 $("refreshBtn").addEventListener("click", async () => { await loadOverview(); if (state.activeTab === "events") await loadEvents(); showToast("数据已刷新"); });
 $("runControlBtn").addEventListener("click", toggleRuntime);
 $("eventSearch").addEventListener("input", loadEvents);
+$("newEventBtn").addEventListener("click", prepareNewEvent);
 $("updateBranchBtn").addEventListener("click", updateCurrentBranch);
 $("addBranchBtn").addEventListener("click", addBranch);
 $("deleteBranchBtn").addEventListener("click", deleteBranch);

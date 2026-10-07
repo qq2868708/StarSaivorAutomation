@@ -132,6 +132,7 @@
           <div><h2>事件库</h2><p>浏览所有事件、分支和量化收益；这里仅进行手动数据维护</p></div>
           <div class="toolbar-controls">
             <label class="search-box"><span>⌕</span><input id="eventSearch" placeholder="搜索事件名、类别或来源"></label>
+            <button class="button secondary" id="newEventBtn">＋ 新建事件</button>
             <span class="mode-badge">手动编辑</span>
             <span class="count-pill" id="eventCount">0 / 0</span>
           </div>
@@ -140,46 +141,52 @@
           <article class="panel event-index-panel">
             <div class="table-wrap">
               <table class="data-table event-table">
-                <thead><tr><th>事件</th><th>类别</th><th>来源</th><th>状态</th><th>推荐</th><th>分支</th></tr></thead>
+                <thead><tr><th>事件</th><th>类别</th><th>来源</th><th>状态</th><th>默认</th><th>分支</th></tr></thead>
                 <tbody id="eventRows"><tr><td colspan="6" class="empty-cell">正在加载…</td></tr></tbody>
               </table>
             </div>
           </article>
-
-          <article class="panel event-editor-panel">
-            <div class="panel-heading">
-              <div><h2>结构化编辑</h2><p id="eventEditorHint">选择事件后编辑推荐分支和收益文本</p></div>
-              <span class="image-badge" id="eventSourceBadge">未选择</span>
-            </div>
-            <div id="eventEmpty" class="editor-empty">从左侧选择一个事件开始编辑</div>
-            <div id="eventEditor" hidden>
-              <div class="form-grid event-meta-form">
-                <label>事件名<input id="eventName"></label>
-                <label>推荐分支<input id="eventRecommended" type="number" min="1"></label>
-              </div>
-              <div class="branch-heading"><h3>事件分支</h3><span>量化结果由收益原文自动整理</span></div>
-              <div class="table-wrap branch-table-wrap">
-                <table class="data-table branch-table">
-                  <thead><tr><th>序号</th><th>关键词</th><th>收益原文</th><th>量化收益</th></tr></thead>
-                  <tbody id="branchRows"></tbody>
-                </table>
-              </div>
-              <div class="branch-form">
-                <div class="form-grid">
-                  <label>序号<input id="branchIndex" type="number" min="1"></label>
-                  <label>关键词<input id="branchKeyword"></label>
+          <template id="eventEditorTemplate">
+            <tr class="event-inline-editor-row" data-inline-editor>
+              <td colspan="6">
+                <div class="inline-event-editor">
+                  <div class="panel-heading inline-editor-heading">
+                    <div><h2>结构化编辑</h2><p id="eventEditorHint">双击左侧事件行即可编辑，也可新建事件</p></div>
+                    <span class="image-badge" id="eventSourceBadge">未选择</span>
+                  </div>
+                  <div id="eventEditor">
+                    <div class="form-grid event-meta-form">
+                      <label>事件名<input id="eventName"></label>
+                      <label>类别<input id="eventCategory" placeholder="例如：支援卡事件"></label>
+                      <label class="recommended-field">默认分支（本地规则）<input id="eventRecommended" type="number" min="1"></label>
+                      <p class="field-help">默认分支只用于本地规则无法量化时的兜底选择；文档核验事件会按各分支量化收益自动评分。</p>
+                    </div>
+                    <div class="branch-heading"><h3>事件分支</h3><span>量化结果由收益原文自动整理</span></div>
+                    <div class="table-wrap branch-table-wrap">
+                      <table class="data-table branch-table">
+                        <thead><tr><th>序号</th><th>关键词</th><th>收益原文</th><th>量化收益</th></tr></thead>
+                        <tbody id="branchRows"></tbody>
+                      </table>
+                    </div>
+                    <div class="branch-form">
+                      <div class="form-grid">
+                        <label>序号<input id="branchIndex" type="number" min="1"></label>
+                        <label>关键词<input id="branchKeyword"></label>
+                      </div>
+                      <label>别名（逗号分隔）<input id="branchAlias"></label>
+                      <label>收益原文<textarea id="branchEffect" rows="3"></textarea></label>
+                      <div class="editor-actions">
+                        <button class="button secondary" id="updateBranchBtn">更新分支</button>
+                        <button class="button ghost" id="addBranchBtn">新增分支</button>
+                        <button class="button danger ghost" id="deleteBranchBtn">删除分支</button>
+                        <button class="button primary" id="saveEventBtn">保存事件</button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <label>别名（逗号分隔）<input id="branchAlias"></label>
-                <label>收益原文<textarea id="branchEffect" rows="3"></textarea></label>
-                <div class="editor-actions">
-                  <button class="button secondary" id="updateBranchBtn">更新分支</button>
-                  <button class="button ghost" id="addBranchBtn">新增分支</button>
-                  <button class="button danger ghost" id="deleteBranchBtn">删除分支</button>
-                  <button class="button primary" id="saveEventBtn">保存事件</button>
-                </div>
-              </div>
-            </div>
-          </article>
+              </td>
+            </tr>
+          </template>
         </div>
       </section>
 
