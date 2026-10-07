@@ -122,7 +122,7 @@ class DataStore:
         return result
 
     def screenshot_candidates(self) -> list[Path]:
-        roots = [ROOT, ROOT / "templates", ROOT.parent / "verification"]
+        roots = [ROOT, ROOT / "templates", ROOT / "logs", ROOT.parent / "verification"]
         paths: list[Path] = []
         for base in roots:
             if not base.exists():
@@ -131,6 +131,18 @@ class DataStore:
             iterator = base.glob(pattern) if base in (ROOT, ROOT / "templates") else base.rglob(pattern)
             paths.extend(p for p in iterator if p.is_file())
         return sorted(set(paths), key=lambda p: p.stat().st_mtime, reverse=True)
+
+    @staticmethod
+    def resolve_screenshot(reference: Any) -> Path | None:
+        """Resolve a logger path while accepting old absolute paths."""
+        if not reference:
+            return None
+        path = Path(str(reference))
+        candidates = [path] if path.is_absolute() else [ROOT / path, ROOT / "logs" / path.name]
+        for candidate in candidates:
+            if candidate.is_file():
+                return candidate
+        return None
 
 
 class InspectorUI(tk.Tk):
@@ -141,10 +153,14 @@ class InspectorUI(tk.Tk):
         self.minsize(1100, 700)
         self.store = DataStore()
         self.event_refs: dict[str, dict[str, Any]] = {}
+        self.decision_refs: dict[str, dict[str, Any]] = {}
         self.selected_event: dict[str, Any] | None = None
         self.selected_option: dict[str, Any] | None = None
         self.image_ref = None
         self.weight_vars: dict[str, tk.StringVar] = {}
+        self.event_filter_var = tk.StringVar()
+        self.run_summary_vars = {key: tk.StringVar(value="—") for key in
+                                 ("run", "actions", "training", "events")}
         self.event_name_var = tk.StringVar()
         self.event_recommended_var = tk.StringVar()
         self.option_index_var = tk.StringVar()
@@ -162,70 +178,123 @@ class InspectorUI(tk.Tk):
             style.theme_use("clam")
         except tk.TclError:
             pass
-        style.configure("Treeview", rowheight=28, font=("Microsoft YaHei UI", 10))
-        style.configure("Treeview.Heading", font=("Microsoft YaHei UI", 10, "bold"))
-        style.configure("TButton", padding=(8, 4))
-        style.configure("Header.TLabel", font=("Microsoft YaHei UI", 16, "bold"))
+        self.configure(background="#f3f5f9")
+        style.configure("App.TFrame", background="#f3f5f9")
+        style.configure("Card.TFrame", background="#ffffff")
+        style.configure("Header.TLabel", background="#f3f5f9", foreground="#172033",
+                        font=("Microsoft YaHei UI", 18, "bold"))
+        style.configure("Subtitle.TLabel", background="#f3f5f9", foreground="#64748b",
+                        font=("Microsoft YaHei UI", 10))
+        style.configure("MetricTitle.TLabel", background="#ffffff", foreground="#64748b",
+                        font=("Microsoft YaHei UI", 9))
+        style.configure("MetricValue.TLabel", background="#ffffff", foreground="#172033",
+                        font=("Microsoft YaHei UI", 15, "bold"))
+        style.configure("Treeview", background="#ffffff", fieldbackground="#ffffff",
+                        foreground="#243247", rowheight=30, font=("Microsoft YaHei UI", 10))
+        style.configure("Treeview.Heading", background="#e9edf5", foreground="#334155",
+                        font=("Microsoft YaHei UI", 10, "bold"), padding=(6, 6))
+        style.map("Treeview", background=[("selected", "#dbeafe")],
+                  foreground=[("selected", "#172033")])
+        style.configure("TButton", padding=(10, 6), font=("Microsoft YaHei UI", 10))
+        style.configure("Accent.TButton", background="#4f46e5", foreground="#ffffff",
+                        padding=(12, 7), font=("Microsoft YaHei UI", 10, "bold"))
+        style.map("Accent.TButton", background=[("active", "#4338ca")])
+        style.configure("TNotebook", background="#f3f5f9", borderwidth=0)
+        style.configure("TNotebook.Tab", padding=(18, 9), font=("Microsoft YaHei UI", 10, "bold"))
+        style.configure("TLabelframe", background="#ffffff", foreground="#334155")
+        style.configure("TLabelframe.Label", background="#ffffff", foreground="#334155",
+                        font=("Microsoft YaHei UI", 10, "bold"))
 
     def _build(self) -> None:
-        header = ttk.Frame(self, padding=(12, 10))
+        header = ttk.Frame(self, padding=(20, 16), style="App.TFrame")
         header.pack(fill="x")
         ttk.Label(header, text="StarSavior 自动化检查台", style="Header.TLabel").pack(side="left")
-        ttk.Label(header, text="读取截图/日志/规则，不发送游戏输入").pack(side="left", padx=18)
+        ttk.Label(header, text="查看运行记录、截图和本地决策规则", style="Subtitle.TLabel").pack(side="left", padx=18)
         ttk.Button(header, text="刷新数据", command=self.refresh_all).pack(side="right", padx=4)
         ttk.Button(header, text="加载截图…", command=self.choose_screenshot).pack(side="right", padx=4)
-        ttk.Button(header, text="保存全部", command=self.save_all).pack(side="right", padx=4)
+        ttk.Button(header, text="保存全部", command=self.save_all, style="Accent.TButton").pack(side="right", padx=4)
 
-        ttk.Label(self, textvariable=self.status_var, relief="sunken", anchor="w").pack(side="bottom", fill="x")
-        main = ttk.PanedWindow(self, orient="horizontal")
-        main.pack(fill="both", expand=True, padx=10, pady=(0, 10))
+        ttk.Label(self, textvariable=self.status_var, background="#e8edf5", foreground="#475569",
+                  anchor="w", padding=(14, 6)).pack(side="bottom", fill="x")
+        self.notebook = ttk.Notebook(self)
+        self.notebook.pack(fill="both", expand=True, padx=14, pady=(0, 12))
 
-        left = ttk.Frame(main, padding=6)
-        right = ttk.Frame(main, padding=6)
-        main.add(left, weight=4)
-        main.add(right, weight=6)
-        self._build_decision_panel(left)
-        self._build_data_panel(right)
+        self.run_tab = ttk.Frame(self.notebook, padding=12, style="App.TFrame")
+        self.events_tab = ttk.Frame(self.notebook, padding=12, style="App.TFrame")
+        self.config_tab = ttk.Frame(self.notebook, padding=12, style="App.TFrame")
+        self.notebook.add(self.run_tab, text="运行")
+        self.notebook.add(self.events_tab, text="事件库")
+        self.notebook.add(self.config_tab, text="配置")
+        self._build_run_tab()
+        self._build_events_tab(self.events_tab)
+        self._build_weights_tab(self.config_tab)
 
-    def _build_decision_panel(self, parent: ttk.Frame) -> None:
-        decision_box = ttk.LabelFrame(parent, text="最近决策与点击目标", padding=6)
-        decision_box.pack(fill="x", expand=False)
-        columns = ("time", "type", "decision", "target")
-        self.decision_tree = ttk.Treeview(decision_box, columns=columns, show="headings", height=8)
-        for col, title, width in (("time", "时间", 90), ("type", "类型", 80),
-                                  ("decision", "决策", 150), ("target", "点击目标", 150)):
+    def _build_run_tab(self) -> None:
+        self.run_tab.columnconfigure(0, weight=1)
+        self.run_tab.rowconfigure(1, weight=1)
+        self.run_tab.rowconfigure(2, weight=1)
+
+        metrics = ttk.Frame(self.run_tab, style="App.TFrame")
+        metrics.grid(row=0, column=0, sticky="ew", pady=(0, 10))
+        for column, (key, title) in enumerate((("run", "最近运行"), ("actions", "记录动作"),
+                                                ("training", "训练次数"), ("events", "事件次数"))):
+            card = ttk.Frame(metrics, padding=(14, 10), style="Card.TFrame")
+            card.grid(row=0, column=column, sticky="ew", padx=(0 if column == 0 else 8, 0))
+            metrics.columnconfigure(column, weight=1)
+            ttk.Label(card, text=title, style="MetricTitle.TLabel").pack(anchor="w")
+            ttk.Label(card, textvariable=self.run_summary_vars[key], style="MetricValue.TLabel").pack(anchor="w", pady=(2, 0))
+
+        split = ttk.PanedWindow(self.run_tab, orient="horizontal")
+        split.grid(row=1, column=0, sticky="nsew")
+        decisions = ttk.LabelFrame(split, text="历史决策（点击记录查看对应截图）", padding=8)
+        screenshot = ttk.LabelFrame(split, text="决策时截图", padding=8)
+        split.add(decisions, weight=5)
+        split.add(screenshot, weight=6)
+
+        columns = ("time", "type", "decision", "target", "shot")
+        self.decision_tree = ttk.Treeview(decisions, columns=columns, show="headings", height=8)
+        for col, title, width in (("time", "时间", 82), ("type", "类型", 78),
+                                  ("decision", "决策", 145), ("target", "点击目标", 145),
+                                  ("shot", "截图", 58)):
             self.decision_tree.heading(col, text=title)
             self.decision_tree.column(col, width=width, anchor="w")
-        self.decision_tree.pack(fill="x", expand=True)
+        self.decision_tree.pack(side="left", fill="both", expand=True)
+        decision_scroll = ttk.Scrollbar(decisions, orient="vertical", command=self.decision_tree.yview)
+        decision_scroll.pack(side="right", fill="y")
+        self.decision_tree.configure(yscrollcommand=decision_scroll.set)
+        self.decision_tree.bind("<<TreeviewSelect>>", self.on_decision_selected)
 
-        shot_box = ttk.LabelFrame(parent, text="截图（手动刷新，不实时采集）", padding=6)
-        shot_box.pack(fill="both", expand=True, pady=(8, 0))
-        self.shot_label = ttk.Label(shot_box, text="暂无截图", anchor="center")
+        self.shot_label = ttk.Label(screenshot, text="选择一条历史决策查看截图", anchor="center")
         self.shot_label.pack(fill="both", expand=True)
         self.shot_path_var = tk.StringVar(value="")
-        ttk.Label(shot_box, textvariable=self.shot_path_var, wraplength=480).pack(fill="x")
+        ttk.Label(screenshot, textvariable=self.shot_path_var, wraplength=680,
+                  foreground="#64748b").pack(fill="x", pady=(8, 0))
 
-        log_box = ttk.LabelFrame(parent, text="运行日志", padding=6)
-        log_box.pack(fill="both", expand=True, pady=(8, 0))
+        log_box = ttk.LabelFrame(self.run_tab, text="运行日志（与本次运行同一页）", padding=8)
+        log_box.grid(row=2, column=0, sticky="nsew", pady=(10, 0))
         self.log_text = tk.Text(log_box, height=9, wrap="word", state="disabled")
         self.log_text.pack(side="left", fill="both", expand=True)
         scroll = ttk.Scrollbar(log_box, orient="vertical", command=self.log_text.yview)
         scroll.pack(side="right", fill="y")
         self.log_text.configure(yscrollcommand=scroll.set)
 
-    def _build_data_panel(self, parent: ttk.Frame) -> None:
-        notebook = ttk.Notebook(parent)
-        notebook.pack(fill="both", expand=True)
-        events_tab = ttk.Frame(notebook, padding=6)
-        weights_tab = ttk.Frame(notebook, padding=12)
-        notebook.add(events_tab, text="事件 / 分支 / 收益")
-        notebook.add(weights_tab, text="决策权重")
-        self._build_events_tab(events_tab)
-        self._build_weights_tab(weights_tab)
-
     def _build_events_tab(self, parent: ttk.Frame) -> None:
-        top = ttk.Frame(parent)
-        top.pack(fill="both", expand=True)
+        parent.columnconfigure(0, weight=1)
+        parent.rowconfigure(1, weight=1)
+        parent.rowconfigure(2, weight=2)
+        toolbar = ttk.Frame(parent, style="App.TFrame")
+        toolbar.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        ttk.Label(toolbar, text="事件 / 分支 / 量化收益", font=("Microsoft YaHei UI", 13, "bold")).pack(side="left")
+        ttk.Label(toolbar, text="搜索").pack(side="left", padx=(24, 6))
+        search = ttk.Entry(toolbar, textvariable=self.event_filter_var, width=28)
+        search.pack(side="left")
+        self.event_filter_var.trace_add("write", lambda *_: self.populate_events())
+        ttk.Button(toolbar, text="清除", command=lambda: self.event_filter_var.set("")).pack(side="left", padx=5)
+
+        top = ttk.LabelFrame(parent, text="事件索引", padding=8)
+        top.grid(row=1, column=0, sticky="nsew")
+        top.columnconfigure(0, weight=1)
+        top.rowconfigure(0, weight=1)
         event_columns = ("name", "category", "source", "verified", "recommended", "options")
         self.event_tree = ttk.Treeview(top, columns=event_columns, show="headings", height=14)
         specs = (("name", "事件", 190), ("category", "类别", 155), ("source", "来源", 90),
@@ -233,14 +302,16 @@ class InspectorUI(tk.Tk):
         for col, title, width in specs:
             self.event_tree.heading(col, text=title)
             self.event_tree.column(col, width=width, anchor="w")
-        self.event_tree.pack(side="left", fill="both", expand=True)
+        self.event_tree.grid(row=0, column=0, sticky="nsew")
         event_scroll = ttk.Scrollbar(top, orient="vertical", command=self.event_tree.yview)
-        event_scroll.pack(side="right", fill="y")
+        event_scroll.grid(row=0, column=1, sticky="ns")
         self.event_tree.configure(yscrollcommand=event_scroll.set)
         self.event_tree.bind("<<TreeviewSelect>>", self.on_event_selected)
 
-        editor = ttk.LabelFrame(parent, text="结构化编辑", padding=8)
-        editor.pack(fill="both", expand=True, pady=(8, 0))
+        editor = ttk.LabelFrame(parent, text="结构化编辑", padding=10)
+        editor.grid(row=2, column=0, sticky="nsew", pady=(10, 0))
+        editor.columnconfigure(0, weight=1)
+        editor.rowconfigure(1, weight=1)
         meta = ttk.Frame(editor)
         meta.pack(fill="x")
         ttk.Label(meta, text="事件名").grid(row=0, column=0, sticky="w")
@@ -286,16 +357,23 @@ class InspectorUI(tk.Tk):
         self.populate_weights()
         self.populate_logs()
         candidates = self.store.screenshot_candidates()
-        if candidates:
+        if candidates and not self.decision_tree.selection():
             self.show_screenshot(candidates[0])
-        self.status_var.set(f"已加载 {len(self.store.events)} 个事件；日志 {len(self.store.logs())} 个")
+        self.status_var.set(f"已加载 {len(self.store.events)} 个事件；日志 {len(self.store.logs())} 个；点击运行记录可回看截图")
 
     def populate_events(self) -> None:
         for item in self.event_tree.get_children():
             self.event_tree.delete(item)
         self.event_refs.clear()
-        for index, event in enumerate(self.store.events):
-            iid = str(index)
+        query = self.event_filter_var.get().strip().lower()
+        visible_index = 0
+        for event in self.store.events:
+            searchable = " ".join(str(event.get(key, "")) for key in
+                                    ("event_name", "id", "category", "source_sheet", "source_type"))
+            if query and query not in searchable.lower():
+                continue
+            iid = str(visible_index)
+            visible_index += 1
             self.event_refs[iid] = event
             self.event_tree.insert("", "end", iid=iid, values=(
                 _compact(event.get("event_name") or event.get("id"), 28),
@@ -454,18 +532,26 @@ class InspectorUI(tk.Tk):
     def populate_logs(self) -> None:
         for item in self.decision_tree.get_children():
             self.decision_tree.delete(item)
+        self.decision_refs.clear()
         logs = self.store.logs()
         latest_text = ""
-        for path, data in logs[:5]:
+        for path, data in logs[:3]:
             latest_text += f"\n===== {path.name} =====\n"
             latest_text += json.dumps(data, ensure_ascii=False, indent=2)
             latest_text += "\n"
+        latest = logs[0][1] if logs else {}
+        summary = latest.get("summary") or {}
+        self.run_summary_vars["run"].set(logs[0][0].stem.replace("run_", "") if logs else "暂无记录")
+        self.run_summary_vars["actions"].set(str(summary.get("total_actions", "—")))
+        self.run_summary_vars["training"].set(str(summary.get("train_count", "—")))
+        self.run_summary_vars["events"].set(str(summary.get("events_encountered", "—")))
+
         for _, data in logs[:3]:
             for action in data.get("actions", [])[-20:]:
                 self._insert_action(action)
             for turn in data.get("turns", []):
                 for action in turn.get("actions", []):
-                    if action.get("type") in {"decision", "train", "event"}:
+                    if action.get("type") in {"decision", "train", "rest", "event", "arcanum", "card_select", "shop"}:
                         self._insert_action(action)
         self.log_text.configure(state="normal")
         self.log_text.delete("1.0", "end")
@@ -477,13 +563,33 @@ class InspectorUI(tk.Tk):
         decision = action.get("attribute") or action.get("action") or action.get("event_name") or action.get("name") or "—"
         target = self._target_text(action)
         timestamp = str(action.get("ts") or action.get("timestamp") or "")[-8:]
-        self.decision_tree.insert("", "end", values=(timestamp, action_type, _compact(decision, 22), target))
+        iid = str(len(self.decision_refs))
+        self.decision_refs[iid] = action
+        shot = "有" if self.store.resolve_screenshot(action.get("screenshot")) else "—"
+        self.decision_tree.insert("", "end", iid=iid,
+                                  values=(timestamp, action_type, _compact(decision, 22), target, shot))
+
+    def on_decision_selected(self, _event=None) -> None:
+        selection = self.decision_tree.selection()
+        if not selection:
+            return
+        action = self.decision_refs.get(selection[0])
+        if not action:
+            return
+        path = self.store.resolve_screenshot(action.get("screenshot"))
+        if path is None:
+            self.shot_label.configure(image="", text="这条历史记录没有保存对应截图\n（旧日志或截图已被清理）")
+            self.shot_path_var.set("")
+            self.status_var.set("该记录没有可用截图")
+            return
+        self.show_screenshot(path)
+        self.status_var.set(f"已显示决策截图：{path.name}")
 
     @staticmethod
     def _target_text(action: dict[str, Any]) -> str:
         if "target_x" in action and "target_y" in action:
             return f"客户区 ({float(action['target_x']):.3f}, {float(action['target_y']):.3f})"
-        row = action.get("row_index")
+        row = action.get("row_index", action.get("target_row"))
         if row is not None:
             names = list(TRAINING_TARGETS.items())
             try:

@@ -507,6 +507,11 @@ class Trainer:
             print("[错误] 截屏失败")
             return False
 
+        # Keep the frame that caused this handler decision.  RunLogger stores
+        # it next to the action record so the UI can reopen the exact screen.
+        if self.logger is not None:
+            self.logger.set_screenshot(screenshot)
+
         frame = FrameContext(screenshot)
 
         for handler in self._handlers.handlers:
@@ -701,6 +706,8 @@ class Trainer:
         """训练决策 + 执行 (移植自 SleepRunner TrainingSelectHandler)"""
         t0 = time.perf_counter()
         self._handler_ctx.round_count = self.round_count
+        if self.logger is not None:
+            self.logger.set_screenshot(screenshot)
 
         # 当前客户端没有底部横排支援卡。旧颜色检测会把立绘误判为卡片，
         # 因而不能在训练决策前执行该点击分支。

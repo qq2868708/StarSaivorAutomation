@@ -16,6 +16,11 @@ from pathlib import Path
 from typing import Optional
 
 
+_SCREENSHOT_ACTION_TYPES = {
+    "decision", "train", "rest", "event", "arcanum", "card_select", "shop",
+}
+
+
 class RunLogger:
     """单次跑马的完整日志记录器"""
 
@@ -42,6 +47,48 @@ class RunLogger:
         self._turn_timing_start: float = 0.0
         self._turn_timings: list[dict] = []
         self._handler_timings: dict[str, list[float]] = {}
+
+        # The trainer supplies the frame currently being evaluated.  Decision
+        # actions keep a relative path to this frame so the inspector can open
+        # the exact screen that produced a historical choice.
+        self._current_screenshot = None
+        self._current_screenshot_path: str | None = None
+        self._screenshot_index = 0
+
+    def set_screenshot(self, screenshot) -> None:
+        """Associate the current game frame with subsequent action logs.
+
+        A new frame clears the cached path.  Multiple actions produced from
+        the same frame (for example a decision followed by its click) reuse
+        one PNG instead of writing duplicate files.
+        """
+        self._current_screenshot = screenshot
+        self._current_screenshot_path = None
+
+    def _save_current_screenshot(self, action_type: str) -> str | None:
+        if self._current_screenshot is None:
+            return None
+        if self._current_screenshot_path:
+            return self._current_screenshot_path
+        try:
+            import cv2
+
+            image = self._current_screenshot
+            if getattr(image, "size", 0) == 0:
+                return None
+            root = Path(__file__).resolve().parent.parent
+            folder = root / "logs" / "screenshots"
+            folder.mkdir(parents=True, exist_ok=True)
+            self._screenshot_index += 1
+            filename = f"{self._run_id}_{self._screenshot_index:04d}_{action_type}.png"
+            path = folder / filename
+            if not cv2.imwrite(str(path), image):
+                return None
+            self._current_screenshot_path = (Path("logs") / "screenshots" / filename).as_posix()
+            return self._current_screenshot_path
+        except Exception as exc:  # screenshot logging must never stop the run
+            print(f"[日志] 决策截图保存失败: {exc}")
+            return None
 
     # ===================== 回合生命周期 =====================
 
@@ -332,4 +379,8 @@ class RunLogger:
             }
         data["type"] = action_type
         data["ts"] = datetime.now().isoformat()
+        if action_type in _SCREENSHOT_ACTION_TYPES:
+            screenshot_path = self._save_current_screenshot(action_type)
+            if screenshot_path:
+                data["screenshot"] = screenshot_path
         self._current_turn["actions"].append(data)
