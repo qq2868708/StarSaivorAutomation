@@ -51,6 +51,7 @@ StarSavior 训练自动化是非官方桌面自动化工具，与《Star Savior�
 ```text
 .
 ├── main.py                  # 主入口
+├── ui_app.py                # 本地检查台：截图、决策、日志、事件与权重编辑
 ├── config.yaml              # 全局配置文件
 ├── src/
 │   ├── trainer.py           # 训练主循环、Handler 链调度
@@ -109,6 +110,18 @@ python main.py
 ```
 
 按 Enter 开始训练，Ctrl+C 中断。
+
+### 4. 打开检查台
+
+```bash
+python ui_app.py
+```
+
+检查台不会连接游戏窗口，也不会发送输入。它读取 `logs/` 中的运行日志、
+本地 PNG 截图、`profiles/events/document_verified.json` 和 `config.yaml`，
+展示最近的决策与相对点击目标，浏览所有事件分支及量化收益，并允许结构化
+修改事件分支和训练/事件决策权重。修改后分别点击“保存事件”或“保存权重”；
+下一次脚本启动时读取这些文件。
 
 ## Handler 优先级链
 
