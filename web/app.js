@@ -40,6 +40,9 @@ function showToast(message, error = false) {
 
 function setTab(tab) {
   state.activeTab = tab;
+  document.querySelectorAll("[data-run-only]").forEach((element) => {
+    element.hidden = tab !== "run";
+  });
   document.querySelectorAll(".nav-item").forEach((button) => {
     button.classList.toggle("active", button.dataset.tab === tab);
   });
