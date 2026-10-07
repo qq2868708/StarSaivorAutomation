@@ -8,8 +8,11 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
+import sys
 import threading
 import webbrowser
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
@@ -37,6 +40,10 @@ TRAINING_TARGETS = {
     "保护训练": (0.86, 0.68),
 }
 ACTION_TYPES = {"decision", "train", "rest", "event", "arcanum", "card_select", "shop"}
+
+_automation_lock = threading.RLock()
+_automation_process: subprocess.Popen[str] | None = None
+_automation_log_handle = None
 
 
 def _compact(value: Any, limit: int = 64) -> str:
@@ -250,6 +257,19 @@ app = FastAPI(title="StarSavior 自动化检查台", docs_url=None, redoc_url=No
 app.mount("/assets", StaticFiles(directory=WEB_DIR), name="assets")
 
 
+def _automation_status() -> dict[str, Any]:
+    with _automation_lock:
+        process = _automation_process
+        if process is None:
+            return {"running": False, "pid": None, "log_path": None, "returncode": None}
+        return {
+            "running": process.poll() is None,
+            "pid": process.pid,
+            "log_path": getattr(process, "_starsavior_log_path", None),
+            "returncode": process.poll(),
+        }
+
+
 @app.get("/", response_class=HTMLResponse)
 def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
@@ -257,7 +277,56 @@ def index() -> FileResponse:
 
 @app.get("/api/health")
 def health() -> dict[str, Any]:
-    return {"ok": True, "events": len(store.events), "logs": len(store.logs())}
+    status = _automation_status()
+    return {"ok": True, "events": len(store.events), "logs": len(store.logs()), "automation": status}
+
+
+@app.get("/api/runtime")
+def runtime_status() -> dict[str, Any]:
+    return _automation_status()
+
+
+@app.post("/api/runtime/start")
+def start_runtime() -> dict[str, Any]:
+    global _automation_process, _automation_log_handle
+    with _automation_lock:
+        if _automation_process is not None and _automation_process.poll() is None:
+            return _automation_status()
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_path = LOG_DIR / f"ui_automation_{stamp}.log"
+        _automation_log_handle = log_path.open("a", encoding="utf-8", errors="replace")
+        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+        _automation_process = subprocess.Popen(
+            [sys.executable, "main.py", "--auto"],
+            cwd=ROOT,
+            stdin=subprocess.DEVNULL,
+            stdout=_automation_log_handle,
+            stderr=subprocess.STDOUT,
+            text=True,
+            creationflags=creationflags,
+        )
+        _automation_process._starsavior_log_path = str(log_path.relative_to(ROOT))
+        return _automation_status()
+
+
+@app.post("/api/runtime/stop")
+def stop_runtime() -> dict[str, Any]:
+    global _automation_process, _automation_log_handle
+    with _automation_lock:
+        process = _automation_process
+        if process is None or process.poll() is not None:
+            return _automation_status()
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=2)
+        if _automation_log_handle is not None:
+            _automation_log_handle.close()
+            _automation_log_handle = None
+        return _automation_status()
 
 
 @app.get("/api/overview")

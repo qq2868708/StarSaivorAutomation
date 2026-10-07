@@ -140,10 +140,44 @@ function selectAction(index, row) {
 async function loadOverview() {
   try {
     renderOverview(await api("/api/overview"));
+    await loadRuntimeStatus();
   } catch (error) {
     $("healthDot").style.background = "#dc5b68";
     showToast(`读取运行数据失败：${error.message}`, true);
   }
+}
+
+function renderRuntimeStatus(status) {
+  const running = Boolean(status?.running);
+  const pill = $("runtimeStatus");
+  const button = $("runControlBtn");
+  pill.textContent = running ? `运行中 · PID ${status.pid}` :
+    (status?.returncode !== null && status?.returncode !== undefined ? `已停止 · ${status.returncode}` : "未运行");
+  pill.classList.toggle("running", running);
+  pill.classList.toggle("error", !running && status?.returncode !== null && status?.returncode !== 0);
+  button.textContent = running ? "■ 停止运行" : "▶ 启动自动化";
+  button.classList.toggle("stop", running);
+  button.classList.toggle("primary", !running);
+  button.classList.toggle("secondary", running);
+}
+
+async function loadRuntimeStatus() {
+  try {
+    state.runtime = await api("/api/runtime");
+    renderRuntimeStatus(state.runtime);
+  }
+  catch (error) { showToast(`读取运行状态失败：${error.message}`, true); }
+}
+
+async function toggleRuntime() {
+  const running = Boolean(state.runtime?.running);
+  try {
+    const status = await api(running ? "/api/runtime/stop" : "/api/runtime/start", { method: "POST" });
+    state.runtime = status;
+    renderRuntimeStatus(status);
+    showToast(running ? "自动化已停止" : "自动化已启动，脚本正在等待游戏界面");
+    await loadOverview();
+  } catch (error) { showToast(`${running ? "停止" : "启动"}自动化失败：${error.message}`, true); }
 }
 
 function renderEvents(items, total) {
@@ -307,6 +341,7 @@ async function copyLog() {
 
 document.querySelectorAll(".nav-item").forEach((button) => button.addEventListener("click", () => setTab(button.dataset.tab)));
 $("refreshBtn").addEventListener("click", async () => { await loadOverview(); if (state.activeTab === "events") await loadEvents(); showToast("数据已刷新"); });
+$("runControlBtn").addEventListener("click", toggleRuntime);
 $("eventSearch").addEventListener("input", loadEvents);
 $("updateBranchBtn").addEventListener("click", updateCurrentBranch);
 $("addBranchBtn").addEventListener("click", addBranch);
@@ -316,3 +351,4 @@ $("saveConfigBtn").addEventListener("click", saveConfig);
 $("copyLogBtn").addEventListener("click", copyLog);
 
 loadOverview();
+setInterval(loadRuntimeStatus, 2000);

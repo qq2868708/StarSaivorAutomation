@@ -61,9 +61,17 @@ h3 { font-size: 13px; }
 .page-subtitle, .panel-heading p, .page-toolbar p { margin-top: 6px; color: var(--muted); font-size: 12px; }
 .top-actions { display: flex; align-items: center; gap: 12px; padding-top: 10px; }
 .updated-label { color: var(--muted); font-size: 11px; }
+.runtime-pill { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border-radius: 8px; color: #66738a; background: #eef1f6; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.runtime-pill::before { width: 6px; height: 6px; border-radius: 50%; content: ""; background: #aab3c2; }
+.runtime-pill.running { color: #19815e; background: #e4f8ef; }
+.runtime-pill.running::before { background: #38c992; box-shadow: 0 0 0 3px rgba(56,201,146,.14); }
+.runtime-pill.error { color: #b94c59; background: #fff0f2; }
+.runtime-pill.error::before { background: #dc5b68; }
 .button { border: 0; border-radius: 9px; padding: 10px 15px; font-weight: 700; font-size: 12px; transition: .18s ease; }
 .button.primary { color: #fff; background: var(--primary); box-shadow: 0 7px 14px rgba(101,87,232,.2); }
 .button.primary:hover { background: #5548d7; transform: translateY(-1px); }
+.button.run-control.stop { color: #b94c59; background: #fff0f2; box-shadow: none; }
+.button.run-control.stop:hover { background: #ffe1e6; }
 .button.secondary { color: #4c40bd; background: var(--primary-soft); }
 .button.secondary:hover { background: #e2dfff; }
 .button.ghost { color: #57647b; border: 1px solid var(--line); background: #fff; }
