@@ -44,3 +44,4 @@ SleepRunner/
 
 # Legacy one-off diagnostics kept outside the repository
 /test_*.py
+/scripts/
