@@ -111,6 +111,14 @@
             <div class="target-result" id="journeyResultMessage" role="status">旅程结束后再核对最终结果。</div>
           </div>
         </details>
+        <details class="panel target-panel" id="quickLookupPanel">
+          <summary><span><strong>救援者 / 阿尔克那数据快查</strong><small id="quickLookupSummary">打开对应界面后分别读取，脚本会遍历可见角色行</small></span><span class="image-badge" id="quickLookupBadge">未读取</span></summary>
+          <div class="target-body">
+            <p>请先把游戏切到前台，再打开救援者界面。读取救援者时脚本只点击 OCR 已确认的右侧可见角色行，不滚动、不抢焦点；然后打开阿尔克那卡片详情再读取。截图和原始识别文字会保存在运行目录。</p>
+            <div class="target-footer"><p id="quickLookupMessage">角色详情属性与旅程最终属性会分开记录，避免把当前面板值误当结算值。</p><div><button class="button secondary" id="scanRescuerBtn">读取救援者并遍历可见角色</button><button class="button secondary" id="scanArcanumBtn">读取当前阿尔克那</button><button class="button primary" id="matchQuickLookupBtn">生成对应关系</button></div></div>
+            <pre id="quickLookupResult" class="quick-lookup-result">尚未读取</pre>
+          </div>
+        </details>
         <div class="metric-grid">
           <article class="metric-card accent-purple">
             <span class="metric-label">最近运行</span>

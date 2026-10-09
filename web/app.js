@@ -7,6 +7,7 @@ const state = {
   selectedBranch: null,
   isNewEvent: false,
   activeTab: "run",
+  quickLookup: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -724,10 +725,81 @@ async function scanJourneyInfo() {
   }
 }
 
+function renderQuickLookup(data) {
+  state.quickLookup = data || null;
+  const match = data?.match;
+  const rescuer = data?.rescuer;
+  const arcanum = data?.arcanum;
+  const details = rescuer?.roster_details || [];
+  const lines = [];
+  if (rescuer) {
+    const character = rescuer.character?.value || "未确认";
+    lines.push(`救援者：${character} · 已读取可见角色详情 ${details.length} 条`);
+    if (rescuer.title) lines.push(`当前标题：${rescuer.title}`);
+    if (rescuer.level) lines.push(`当前等级：Lv.${rescuer.level}${rescuer.level_max ? `/${rescuer.level_max}` : ""}`);
+    if (rescuer.rarity) lines.push(`稀有度：${rescuer.rarity}`);
+    if (details.length) lines.push(`角色列表：${details.map((item) => `${item.character || "未知"} Lv.${item.level ?? "?"}`).join("、")}`);
+  }
+  if (arcanum) {
+    const card = arcanum.cards?.[0] || {};
+    const name = card.name?.value || "卡名待确认";
+    lines.push(`阿尔克那：${name} · ${card.rarity || "稀有度未知"} · Lv.${card.level ?? "?"}`);
+    const effects = Object.values(card.effects || {}).flat().map((item) => item.text).filter(Boolean);
+    if (effects.length) lines.push(`效果：${effects.join("；")}`);
+  }
+  if (match) {
+    lines.push(`对应关系：${match.status === "matched" ? "已匹配" : "部分匹配"}`);
+    lines.push(`旅程角色字段：${match.journey_end_mapping?.["actual_setup.character"]?.value || "未确认"}`);
+    const cards = match.journey_end_mapping?.["actual_setup.support_cards"]?.value;
+    lines.push(`旅程支援卡字段：${cards?.map((item) => item.name).join("、") || "未确认"}`);
+    lines.push("救援者当前属性不会写入旅程最终属性字段。" );
+    if ((match.uncertain || []).length) lines.push(`待人工确认：${match.uncertain.join("、")}`);
+  }
+  $("quickLookupResult").textContent = lines.join("\n") || "尚未读取";
+  $("quickLookupBadge").textContent = match ? (match.status === "matched" ? "已匹配" : "部分匹配") : (rescuer || arcanum ? "已读取" : "未读取");
+  $("quickLookupBadge").classList.toggle("ready", Boolean(match));
+  $("quickLookupSummary").textContent = match ? `最近匹配：${formatTime(match.observed_at)}` : "打开对应界面后分别读取，脚本会遍历可见角色行";
+}
+
+async function loadQuickLookup() {
+  try { renderQuickLookup(await api("/api/quick-lookup")); }
+  catch (error) { showToast(`读取快查状态失败：${error.message}`, true); }
+}
+
+async function quickLookupAction(path, label) {
+  const button = $(path.includes("rescuer") ? "scanRescuerBtn" : "scanArcanumBtn");
+  button.disabled = true;
+  $("quickLookupMessage").textContent = `${label}；请保持 StarSavior 在前台…`;
+  try {
+    const data = await api(`/api/quick-lookup/${path}`, { method: "POST" });
+    renderQuickLookup(data);
+    $("quickLookupMessage").textContent = `${label}完成，截图和 OCR 已保存。`;
+    showToast(`${label}完成`);
+  } catch (error) {
+    $("quickLookupMessage").textContent = error.message;
+    showToast(`${label}失败：${error.message}`, true);
+  } finally { button.disabled = false; }
+}
+
+async function matchQuickLookup() {
+  const button = $("matchQuickLookupBtn");
+  button.disabled = true;
+  try {
+    const data = await api("/api/quick-lookup/match", { method: "POST" });
+    renderQuickLookup(data);
+    $("quickLookupMessage").textContent = data.match?.status === "matched" ? "已生成角色、支援卡与旅程结束字段对应关系。" : "已生成部分对应关系，未确认字段已保留。";
+    showToast("对应关系已生成");
+  } catch (error) { $("quickLookupMessage").textContent = error.message; showToast(`生成对应关系失败：${error.message}`, true); }
+  finally { button.disabled = false; }
+}
+
 $("journeyRecordSelect").addEventListener("change", renderJourneyRecord);
 $("refreshJourneyRecordsBtn").addEventListener("click", loadJourneyRecords);
 $("scanJourneyInfoBtn").addEventListener("click", scanJourneyInfo);
 $("saveJourneyResultBtn").addEventListener("click", saveJourneyResult);
+$("scanRescuerBtn").addEventListener("click", () => quickLookupAction("scan-rescuer", "救援者扫描"));
+$("scanArcanumBtn").addEventListener("click", () => quickLookupAction("scan-arcanum", "阿尔克那扫描"));
+$("matchQuickLookupBtn").addEventListener("click", matchQuickLookup);
 
 document.querySelectorAll(".nav-item").forEach((button) => button.addEventListener("click", () => setTab(button.dataset.tab)));
 $("refreshBtn").addEventListener("click", async () => { await loadOverview(); if (state.activeTab === "events") await loadEvents(); showToast("数据已刷新"); });
@@ -745,4 +817,5 @@ $("copyLogBtn").addEventListener("click", copyLog);
 loadOverview();
 loadJourneyTarget();
 loadJourneyRecords();
+loadQuickLookup();
 setInterval(loadRuntimeStatus, 2000);

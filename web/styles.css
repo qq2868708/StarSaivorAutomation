@@ -26,6 +26,7 @@ button { cursor: pointer; }
 .runtime-summary p { color: var(--muted); font-size: 12px; margin: 9px 0 0; }
 .runtime-controls { display: flex; flex-wrap: wrap; gap: 8px; }
 .button:disabled { cursor: wait; opacity: .55; }
+.quick-lookup-result { min-height: 92px; margin: 14px 0 0; padding: 12px 14px; overflow: auto; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: var(--surface-soft); font: 12px/1.65 Consolas, "Microsoft YaHei UI", monospace; white-space: pre-wrap; }
 
 .sidebar {
   width: 230px;

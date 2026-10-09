@@ -31,6 +31,7 @@ from src.runtime_control import RuntimeControl, process_alive
 from src.journey_target import JourneyTargetStore, JourneyTargetPending, load_catalog, precheck_target
 from src.journey_record import JourneyRecordStore
 from src.journey_info_scan import JourneyInfoScanner, JourneyInfoScanError
+from src.quick_lookup import QuickLookupScanner, QuickLookupStore, build_match
 
 
 ROOT = Path(__file__).resolve().parent
@@ -386,6 +387,64 @@ def scan_current_journey_record(journey_id: str):
         raise HTTPException(409, str(error)) from error
     except (ValueError, OSError, RuntimeError) as error:
         raise HTTPException(409, str(error)) from error
+
+
+def _quick_lookup_store():
+    return QuickLookupStore(_runtime_control.root)
+
+
+@app.get("/api/quick-lookup")
+def quick_lookup_state():
+    """Return the latest explicit rescuer/Arcana scans and their mapping."""
+    return _quick_lookup_store().read()
+
+
+@app.post("/api/quick-lookup/scan-rescuer")
+def scan_quick_rescuer():
+    """Read the visible rescuer page and OCR-confirmed right-side rows.
+
+    The user opens the page and keeps the game foreground.  The scanner may
+    click only the OCR-confirmed visible rows; it never scrolls, refocuses, or
+    changes a running journey.
+    """
+    runtime = _automation_status()
+    if runtime["running"]:
+        raise HTTPException(409, "脚本仍在运行，请停止后再做数据快查")
+    game = store.config.get("game", {}) if isinstance(store.config, dict) else {}
+    try:
+        scan = QuickLookupScanner(_runtime_control.root,
+                                  window_title=game.get("window_title", "StarSavior")).scan("rescuer")
+        return _quick_lookup_store().save_scan("rescuer", scan, scan.get("screenshot"))
+    except (ValueError, OSError, RuntimeError) as error:
+        raise HTTPException(409, str(error)) from error
+
+
+@app.post("/api/quick-lookup/scan-arcanum")
+def scan_quick_arcanum():
+    """Read the currently visible Arcana/support-card page without input."""
+    runtime = _automation_status()
+    if runtime["running"]:
+        raise HTTPException(409, "脚本仍在运行，请停止后再做数据快查")
+    game = store.config.get("game", {}) if isinstance(store.config, dict) else {}
+    try:
+        scan = QuickLookupScanner(_runtime_control.root,
+                                  window_title=game.get("window_title", "StarSavior")).scan("arcanum",
+                                                                                          traverse_rescuer=False)
+        return _quick_lookup_store().save_scan("arcanum", scan, scan.get("screenshot"))
+    except (ValueError, OSError, RuntimeError) as error:
+        raise HTTPException(409, str(error)) from error
+
+
+@app.post("/api/quick-lookup/match")
+def match_quick_lookup():
+    state = _quick_lookup_store().read()
+    if not state.get("rescuer") and not state.get("arcanum"):
+        raise HTTPException(409, "请先读取救援者或阿尔克那界面")
+    match = build_match(state.get("rescuer"), state.get("arcanum"), screenshots={
+        key: (state.get(key) or {}).get("screenshot") for key in ("rescuer", "arcanum")
+    })
+    _quick_lookup_store().save_match(match)
+    return {**state, "match": match}
 
 
 @app.put("/api/journey-target")
