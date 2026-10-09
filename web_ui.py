@@ -1,8 +1,10 @@
 """Local WebUI for inspecting StarSavior automation runs.
 
-The server only reads the game artifacts written by the automation and writes
-the event/config files after an explicit save request from the browser.  It
-never attaches to the game window or sends input.
+The server reads the game artifacts written by the automation and writes the
+event/config files after an explicit save request from the browser. Runtime
+controls are sent to the automation process through a local JSON command
+queue. The post-run journey-information scan is the one explicit exception:
+it verifies the foreground game and may click the magnifier once.
 """
 from __future__ import annotations
 
@@ -25,6 +27,10 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.event_effects import quantify_effect_text
+from src.runtime_control import RuntimeControl, process_alive
+from src.journey_target import JourneyTargetStore, JourneyTargetPending, load_catalog, precheck_target
+from src.journey_record import JourneyRecordStore
+from src.journey_info_scan import JourneyInfoScanner, JourneyInfoScanError
 
 
 ROOT = Path(__file__).resolve().parent
@@ -45,6 +51,7 @@ ACTION_TYPES = {"decision", "train", "rest", "event", "arcanum", "card_select", 
 _automation_lock = threading.RLock()
 _automation_process: subprocess.Popen[str] | None = None
 _automation_log_handle = None
+_runtime_control = RuntimeControl(ROOT)
 
 
 def _compact(value: Any, limit: int = 64) -> str:
@@ -259,16 +266,26 @@ app.mount("/assets", StaticFiles(directory=WEB_DIR), name="assets")
 
 
 def _automation_status() -> dict[str, Any]:
-    with _automation_lock:
-        process = _automation_process
-        if process is None:
-            return {"running": False, "pid": None, "log_path": None, "returncode": None}
-        return {
-            "running": process.poll() is None,
-            "pid": process.pid,
-            "log_path": getattr(process, "_starsavior_log_path", None),
-            "returncode": process.poll(),
-        }
+    runtime = _runtime_control.read_status()
+    checkpoint = _runtime_control.read_checkpoint()
+    process = _automation_process
+    managed_alive = process is not None and process.poll() is None
+    owner_alive = process_alive(runtime.get("pid")) and runtime.get("state") not in {
+        "stopped", "journey_end", "finished", "offline"}
+    state = runtime.get("state", "offline")
+    if managed_alive and not owner_alive:
+        state = "starting"
+    elif not owner_alive and state not in {"stopped", "journey_end", "finished", "offline"}:
+        state = "process_exit"
+    return {
+        "running": bool(managed_alive or owner_alive),
+        "automatic_active": owner_alive and state == "running",
+        "pid": runtime.get("pid") if owner_alive else (process.pid if managed_alive else None),
+        "log_path": getattr(process, "_starsavior_log_path", None) if process else None,
+        "returncode": process.poll() if process else None,
+        "state": state, "reason": runtime.get("reason", ""), "status": runtime,
+        "checkpoint": checkpoint,
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -287,47 +304,258 @@ def runtime_status() -> dict[str, Any]:
     return _automation_status()
 
 
+def _target_store():
+    return JourneyTargetStore(_runtime_control.root)
+
+
+@app.get("/api/journey-target")
+def journey_target():
+    runtime = _automation_status()
+    try:
+        target = _target_store().read()
+        checked = precheck_target(target or {})
+    except JourneyTargetPending as error:
+        target = None
+        checked = {"ready": False, "errors": [str(error)], "warnings": []}
+    applied = runtime["status"].get("journey_target") or {}
+    return {"catalog": load_catalog(), "target": target, "precheck": checked,
+            "applied": bool(target and applied.get("revision") == target.get("revision")),
+            "progress": runtime["status"].get("journey_target_state") if target and applied.get("revision") == target.get("revision") else None,
+            "script_supports_targets": "journey_target" in runtime["status"],
+            "runtime_state": runtime["state"], "running": runtime["running"]}
+
+
+@app.post("/api/journey-target/precheck")
+def check_journey_target(body: dict[str, Any]):
+    return precheck_target(body)
+
+
+@app.get("/api/journey-records")
+def journey_records():
+    records = JourneyRecordStore(_runtime_control.root)
+    result = []
+    if records.directory.exists():
+        for path in sorted(records.directory.glob("*.json"), key=lambda item: item.stat().st_mtime, reverse=True)[:100]:
+            try:
+                result.append(records.read(path.stem))
+            except (OSError, ValueError):
+                continue
+    return {"records": result, "active_journey_id": _automation_status()["status"].get("journey_id")}
+
+
+@app.patch("/api/journey-records/{journey_id}")
+def supplement_journey_record(journey_id: str, body: dict[str, Any]):
+    runtime = _automation_status()
+    if runtime["running"] and runtime["status"].get("journey_id") == journey_id:
+        raise HTTPException(409, "本轮脚本尚未退出，退出后再补录结算结果")
+    try:
+        return JourneyRecordStore(_runtime_control.root).supplement(journey_id, body)
+    except FileNotFoundError as error:
+        raise HTTPException(404, str(error)) from error
+    except (ValueError, OSError) as error:
+        raise HTTPException(400, str(error)) from error
+
+
+@app.post("/api/journey-records/{journey_id}/scan-current")
+def scan_current_journey_record(journey_id: str):
+    """Read the currently visible journey-information panel.
+
+    The automation process must be stopped first.  When the terminal page is
+    visible the scanner may perform the single, verified magnifier click; it
+    never resumes a journey or chooses rewards/skills.
+    """
+    runtime = _automation_status()
+    if runtime["running"]:
+        raise HTTPException(409, "脚本仍在运行，请等旅程结束后再读取旅程信息")
+    records = JourneyRecordStore(_runtime_control.root)
+    try:
+        record = records.read(journey_id)
+        if record is None:
+            raise FileNotFoundError("旅程记录不存在")
+        if not record["outcome"]["journey_ended"]:
+            raise ValueError("旅程尚未结束，请结束后再读取旅程信息")
+        game = store.config.get("game", {}) if isinstance(store.config, dict) else {}
+        scan = JourneyInfoScanner(_runtime_control.root,
+                                  window_title=game.get("window_title", "StarSavior")).scan()
+        updated = records.apply_screen_scan(journey_id, scan)
+        missing = list(updated.get("data_quality", {}).get("missing_fields", []))
+        return {"record": updated, "scan": scan, "missing_fields": missing}
+    except FileNotFoundError as error:
+        raise HTTPException(404, str(error)) from error
+    except JourneyInfoScanError as error:
+        raise HTTPException(409, str(error)) from error
+    except (ValueError, OSError, RuntimeError) as error:
+        raise HTTPException(409, str(error)) from error
+
+
+@app.put("/api/journey-target")
+def save_journey_target(body: dict[str, Any]):
+    with _automation_lock:
+        runtime = _automation_status()
+        if runtime["running"] and runtime["state"] not in {"paused_safe", "paused_manual"}:
+            raise HTTPException(409, "请先暂停脚本，再更改本轮目标")
+        try:
+            _target_store().save(body, runtime["status"].get("run_id") if runtime["running"] else None)
+        except JourneyTargetPending as error:
+            raise HTTPException(400, str(error))
+        return journey_target()
+
+
+def _require_start_target(runtime):
+    try:
+        target = _target_store().read()
+        checked = precheck_target(target or {})
+    except JourneyTargetPending as error:
+        raise HTTPException(409, str(error))
+    if not target or not checked["ready"]:
+        raise HTTPException(409, "请先完成旅程目标预检查并保存")
+    scope = target.get("scope_run_id")
+    previous = runtime.get("checkpoint") or {}
+    if scope and (scope != previous.get("run_id") or previous.get("resumable") is False):
+        raise HTTPException(409, "目标属于已结束或其他旅程，请重新保存本轮目标")
+
+
 @app.post("/api/runtime/start")
 def start_runtime() -> dict[str, Any]:
     global _automation_process, _automation_log_handle
     with _automation_lock:
-        if _automation_process is not None and _automation_process.poll() is None:
+        if _automation_status()["running"]:
             return _automation_status()
+        _require_start_target(_automation_status())
+        if _automation_log_handle is not None:
+            _automation_log_handle.close()
         LOG_DIR.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S") + "_" + uuid.uuid4().hex[:6]
         log_path = LOG_DIR / f"ui_automation_{stamp}.log"
         _automation_log_handle = log_path.open("a", encoding="utf-8", errors="replace")
-        creationflags = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
-        _automation_process = subprocess.Popen(
-            [sys.executable, "main.py", "--auto"],
-            cwd=ROOT,
-            stdin=subprocess.DEVNULL,
-            stdout=_automation_log_handle,
-            stderr=subprocess.STDOUT,
-            text=True,
-            creationflags=creationflags,
-        )
+        try:
+            _automation_process = subprocess.Popen(
+                [sys.executable, "-u", "main.py", "--auto", "--resume"], cwd=ROOT,
+                stdin=subprocess.DEVNULL, stdout=_automation_log_handle,
+                stderr=subprocess.STDOUT, text=True,
+                creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+            )
+        except Exception:
+            _automation_log_handle.close()
+            _automation_log_handle = None
+            raise
         _automation_process._starsavior_log_path = str(log_path.relative_to(ROOT))
         return _automation_status()
 
 
+def _issue_runtime_command(command: str, payload=None):
+    runtime = _automation_status()
+    if not runtime["running"] or runtime["state"] in {"starting", "process_exit"}:
+        raise HTTPException(409, "当前没有可控制的运行实例")
+    status = runtime["status"]
+    if command in {"resume", "step"} and status.get("state") not in {"paused_manual", "paused_safe"}:
+        raise HTTPException(409, "继续和单步只能在暂停状态使用")
+    if command in {"resume", "step"} and _target_store().read() and "journey_target" not in status:
+        raise HTTPException(409, "当前脚本尚未加载目标功能，请使用重启恢复加载新版本")
+    return _runtime_control.issue(command, **(payload or {}), run_id=status["run_id"])
+
+
 @app.post("/api/runtime/stop")
 def stop_runtime() -> dict[str, Any]:
-    global _automation_process, _automation_log_handle
-    with _automation_lock:
-        process = _automation_process
-        if process is None or process.poll() is not None:
-            return _automation_status()
-        process.terminate()
-        try:
-            process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=2)
-        if _automation_log_handle is not None:
-            _automation_log_handle.close()
-            _automation_log_handle = None
+    if not _automation_status()["running"]:
         return _automation_status()
+    command = _issue_runtime_command("stop")
+    return {**_automation_status(), "command": command}
+
+
+@app.post("/api/runtime/restart")
+def restart_runtime() -> dict[str, Any]:
+    # Let the script unwind and save its checkpoint. Never start a second owner.
+    with _automation_lock:
+        status = _automation_status()
+        _require_start_target(status)
+        if status["running"]:
+            if status["state"] == "starting":
+                raise HTTPException(409, "脚本仍在启动，请稍后重试")
+            _issue_runtime_command("stop")
+            import time
+            deadline = time.monotonic() + 8
+            while _automation_status()["running"] and time.monotonic() < deadline:
+                time.sleep(0.1)
+            if _automation_status()["running"]:
+                raise HTTPException(409, "脚本仍在收束当前操作，尚未重启；等待停止后再启动")
+        return start_runtime()
+
+
+@app.post("/api/runtime/pause")
+def pause_runtime() -> dict[str, Any]:
+    command = _issue_runtime_command("pause")
+    return {**_automation_status(), "command": command}
+
+
+@app.post("/api/runtime/resume")
+def resume_runtime() -> dict[str, Any]:
+    command = _issue_runtime_command("resume")
+    return {**_automation_status(), "command": command}
+
+
+@app.post("/api/runtime/step")
+def step_runtime() -> dict[str, Any]:
+    command = _issue_runtime_command("step")
+    return {**_automation_status(), "command": command}
+
+
+@app.get("/api/runtime/diagnostics")
+def runtime_diagnostics() -> dict[str, Any]:
+    runtime = _automation_status()
+    status = runtime["status"]
+    snapshot = status.get("screenshot")
+    current = store.resolve_screenshot(snapshot)
+    return {**runtime, "safe_for_ai": runtime["running"] and runtime["state"] == "paused_safe",
+            "screenshot_url": f"/api/screenshot?path={quote(str(snapshot), safe='')}" if current else None}
+
+
+@app.post("/api/runtime/ai-claim")
+def runtime_ai_claim(body: dict[str, Any]):
+    try:
+        return _runtime_control.claim_ai(body.get("client_id", ""), body.get("run_id"), body.get("pause_id"))
+    except ValueError as error:
+        raise HTTPException(409, str(error))
+
+
+@app.post("/api/runtime/ai-action")
+def runtime_ai_action(body: dict[str, Any]):
+    runtime = _automation_status()
+    status = runtime["status"]
+    if not runtime["running"] or runtime["state"] != "paused_safe":
+        raise HTTPException(409, "AI 接管只允许在脚本安全暂停后使用")
+    if not _runtime_control.valid_ai(body, status["run_id"], status.get("pause_id")):
+        raise HTTPException(409, "AI 客户端未接入、会话过期或本次暂停已变化")
+    kind = body.get("kind")
+    if kind not in {"inspect", "click", "resume", "stop"}:
+        raise HTTPException(400, "支持的 AI 操作为 inspect/click/resume/stop")
+    if kind == "resume" and _target_store().read() and "journey_target" not in status:
+        raise HTTPException(409, "当前脚本尚未加载目标功能，需要人工重启恢复加载新版本")
+    if not isinstance(body.get("action_id"), str) or not body["action_id"].strip():
+        raise HTTPException(400, "需要唯一 action_id")
+    if kind == "click":
+        import math
+        try:
+            x, y = float(body["x"]), float(body["y"])
+        except (ValueError, TypeError, KeyError):
+            raise HTTPException(400, "click 需要数值 x/y")
+        if not (math.isfinite(x) and math.isfinite(y) and 0 <= x <= 1 and 0 <= y <= 1):
+            raise HTTPException(400, "x/y 必须在 0..1")
+        if body.get("expected_frame_id") != status.get("frame_id"):
+            raise HTTPException(409, "画面已更新，需要读取最新诊断")
+    # Copy only protocol fields. The request cannot replace command ids or kinds.
+    fields = ("kind", "run_id", "pause_id", "lease_id", "action_id", "expected_frame_id", "x", "y")
+    payload = {key: body[key] for key in fields if key in body}
+    command = _runtime_control.issue("ai_action", **payload)
+    return {"queued": True, "command_id": command["id"]}
+
+
+@app.get("/api/runtime/commands/{command_id}")
+def command_result(command_id: str):
+    if len(command_id) != 32 or any(c not in "0123456789abcdef" for c in command_id):
+        raise HTTPException(400, "无效命令 ID")
+    return _runtime_control._read(_runtime_control.directory / "acks" / f"{command_id}.json") or {
+        "id": command_id, "pending": True}
 
 
 @app.get("/api/overview")

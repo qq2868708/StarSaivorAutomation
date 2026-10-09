@@ -153,35 +153,87 @@ async function loadOverview() {
 
 function renderRuntimeStatus(status) {
   const running = Boolean(status?.running);
+  const state = status?.state || status?.status?.state || "offline";
   const pill = $("runtimeStatus");
   const button = $("runControlBtn");
-  pill.textContent = running ? `运行中 · PID ${status.pid}` :
-    (status?.returncode !== null && status?.returncode !== undefined ? `已停止 · ${status.returncode}` : "未运行");
-  pill.classList.toggle("running", running);
-  pill.classList.toggle("error", !running && status?.returncode !== null && status?.returncode !== 0);
+  const labels = { running: "运行中", paused_manual: "手动暂停", paused_safe: "安全暂停",
+    starting: "启动中", recovering: "重新识别中", process_exit: "进程已退出，可重启恢复", finished: "已结束", journey_end: "旅程结束", stopped: "已停止", offline: "未运行" };
+  pill.textContent = `${labels[state] || state}${running && status.pid ? ` · PID ${status.pid}` : ""}`;
+  pill.title = status.reason || status?.status?.reason || "";
+  pill.classList.toggle("running", running && state === "running");
+  pill.classList.toggle("error", state === "paused_safe" || state === "finished");
   button.textContent = running ? "■ 停止运行" : "▶ 启动自动化";
   button.classList.toggle("stop", running);
   button.classList.toggle("primary", !running);
   button.classList.toggle("secondary", running);
+  const paused = running && ["paused_manual", "paused_safe"].includes(state);
+  $("pauseRuntimeBtn").hidden = !running || !["running", "recovering"].includes(state);
+  $("resumeRuntimeBtn").hidden = !paused;
+  $("stepRuntimeBtn").hidden = !paused;
+  $("restartRuntimeBtn").hidden = !running || state === "starting";
+  $("inspectRuntimeBtn").hidden = !status?.status?.screenshot;
+  const reason = status?.status?.diagnostics?.error || status?.reason || "";
+  $("runtimeReason").textContent = state === "paused_safe" ? `${reason} · 等待人工或 AI 处理` :
+    (reason || "自动运行与恢复由脚本完成；暂停后继续会重新识别当前界面");
+  renderTargetApplied(status);
 }
 
 async function loadRuntimeStatus() {
   try {
     state.runtime = await api("/api/runtime");
     renderRuntimeStatus(state.runtime);
+    if (state.selectedJourneyRecord) {
+      $("saveJourneyResultBtn").disabled = !state.selectedJourneyRecord.outcome.journey_ended || Boolean(state.runtime.running && state.runtime.status?.journey_id === state.selectedJourneyRecord.journey_id);
+      $("scanJourneyInfoBtn").disabled = !state.selectedJourneyRecord.outcome.journey_ended || Boolean(state.runtime.running);
+    }
+    const recordKey = `${state.runtime.status?.journey_id || ""}:${state.runtime.state === "journey_end" ? "ended" : "active"}`;
+    if (state.lastJourneyRecordKey !== recordKey && state.runtime.status?.journey_id) {
+      state.lastJourneyRecordKey = recordKey;
+      await loadJourneyRecords();
+    }
+    const status = state.runtime.status || {};
+    const key = `${status.run_id || ""}:${status.round_count || 0}:${state.runtime.state}`;
+    if (state.activeTab === "run" && state.lastOverviewKey !== key) {
+      state.lastOverviewKey = key;
+      renderOverview(await api("/api/overview"));
+    }
   }
   catch (error) { showToast(`读取运行状态失败：${error.message}`, true); }
 }
 
 async function toggleRuntime() {
   const running = Boolean(state.runtime?.running);
+  if (!running && !targetIsSaved()) return;
   try {
     const status = await api(running ? "/api/runtime/stop" : "/api/runtime/start", { method: "POST" });
     state.runtime = status;
     renderRuntimeStatus(status);
-    showToast(running ? "自动化已停止" : "自动化已启动，脚本正在等待游戏界面");
+    showToast(running ? "已请求停止，脚本正在保存状态" : "自动化已启动，脚本将识别当前界面");
     await loadOverview();
   } catch (error) { showToast(`${running ? "停止" : "启动"}自动化失败：${error.message}`, true); }
+}
+
+async function sendRuntimeCommand(path, label) {
+  if (["resume", "step", "restart"].includes(path) && !targetIsSaved()) return;
+  try {
+    const status = await api(`/api/runtime/${path}`, { method: "POST" });
+    state.runtime = status;
+    renderRuntimeStatus(status);
+    showToast(label);
+  } catch (error) { showToast(`${label}失败：${error.message}`, true); }
+}
+
+async function inspectRuntime() {
+  try {
+    const data = await api("/api/runtime/diagnostics");
+    if (!data.screenshot_url) { showToast("当前没有可用的现场截图", true); return; }
+    $("decisionImage").src = data.screenshot_url;
+    $("decisionImage").hidden = false;
+    $("screenshotPlaceholder").hidden = true;
+    $("screenshotCaption").textContent = `${data.status.last_handler || "现场"} · ${data.reason || data.state}`;
+    $("screenshotPath").textContent = data.status.screenshot;
+    $("screenshotBadge").textContent = "暂停现场";
+  } catch (error) { showToast(`读取现场失败：${error.message}`, true); }
 }
 
 function renderEvents(items, total) {
@@ -270,6 +322,10 @@ function ensureInlineEditor(index) {
   const target = index === null ? null : rows.querySelector(`tr[data-event-index="${index}"]`);
   if (target) target.after(fragment);
   else rows.prepend(fragment);
+  $("updateBranchBtn").addEventListener("click", updateCurrentBranch);
+  $("addBranchBtn").addEventListener("click", addBranch);
+  $("deleteBranchBtn").addEventListener("click", deleteBranch);
+  $("saveEventBtn").addEventListener("click", saveEvent);
   return true;
 }
 
@@ -428,17 +484,265 @@ async function copyLog() {
   } catch (_) { showToast("浏览器不允许访问剪贴板，请手动复制", true); }
 }
 
+function targetIsSaved() {
+  if (state.targetDirty || !state.targetData?.target || !state.targetData.precheck?.ready) {
+    $("journeyTargetPanel").open = true;
+    showToast("请先预检查并保存本轮目标", true);
+    return false;
+  }
+  return true;
+}
+
+function targetForm() {
+  return { character: $("targetCharacter").value.trim(), playstyle: $("targetPlaystyle").value,
+    combo_code: $("targetCombo").value, training_direction: $("targetTrainingDirection").value,
+    has_partner: $("targetHasPartner").checked,
+    actual_setup: { character: $("setupCharacter").value.trim() || null,
+      journey_records: setupEntries("setupJourneyRecords", "journey_records"),
+      support_cards: setupEntries("setupSupportCards", "support_cards") } };
+}
+
+function entryLines(value) {
+  const text = value.trim();
+  return text === "无" ? [] : text ? text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean) : null;
+}
+
+function setupEntries(id, key) {
+  const names = entryLines($(id).value);
+  const saved = state.targetData?.target?.actual_setup?.[key];
+  if (saved && JSON.stringify(names) === JSON.stringify(saved.map((item) => item.name))) return saved;
+  return names;
+}
+
+function targetDirty() {
+  state.targetDirty = true;
+  $("targetBadge").textContent = "未保存";
+  $("targetSummary").textContent = "目标已更改，请重新预检查并保存";
+  $("targetResult").textContent = "当前编辑尚未保存。";
+  $("targetResult").className = "target-result";
+}
+
+function renderTargetRecommendations() {
+  const catalog = state.targetData?.catalog;
+  if (!catalog) return;
+  const name = $("targetCharacter").value.trim();
+  const character = catalog.characters.find((item) => [item.name, ...(item.aliases || [])].includes(name));
+  const codes = character?.recommendations?.[$("targetPlaystyle").value] || [];
+  const area = $("targetRecommendations");
+  area.innerHTML = codes.length ? `<span>表格推荐 · 可任选其一：</span>${codes.map((code) => {
+    const combo = catalog.combos.find((item) => item.code === code);
+    return `<button class="button ghost" data-target-preset="${esc(code)}">${esc(combo.label)}</button>`;
+  }).join("")}` : "该角色推荐尚未收录；可手动选择目标组合。";
+  area.querySelectorAll("[data-target-preset]").forEach((button) => button.addEventListener("click", () => {
+    $("targetCombo").value = button.dataset.targetPreset;
+    updateTargetCombo(true);
+    targetDirty();
+  }));
+}
+
+function updateTargetCombo(suggest = false) {
+  const combo = state.targetData?.catalog.combos.find((item) => item.code === $("targetCombo").value);
+  const directions = { attack: "攻击向", survival: "生存向", comprehensive: "综合向", tactical: "战术向" };
+  $("targetEffect").hidden = !combo;
+  $("targetEffect").textContent = combo ? `${combo.label}\n${combo.effect_text}${combo.note ? `\n${combo.note}` : ""}\n脚本自动规划：三月选择${directions[combo.event_direction]}声援。${combo.special ? `取得${combo.partner_material}特殊装备。` : `组合需要${combo.initial_material}起始装备 ＋ ${combo.partner_material}后续装备。`}` : "";
+  if (suggest && combo) {
+    $("targetHasPartner").checked = false;
+  }
+}
+
+function renderTargetCheck(result) {
+  const directions = { attack: "攻击向", survival: "生存向", comprehensive: "综合向", tactical: "战术向" };
+  const messages = result.ready ? [`预检查通过。脚本将根据 ${result.target.combo_code} 自动选择${directions[result.target.event_direction]}声援。`, ...(result.warnings || [])] : (result.errors || ["预检查未通过"]);
+  $("targetResult").textContent = messages.join("\n");
+  $("targetResult").className = `target-result ${result.ready ? "ready" : "error"}`;
+}
+
+function renderTargetApplied(runtime) {
+  if (!state.targetData || state.targetDirty) return;
+  const saved = state.targetData.target;
+  if (!saved) return;
+  const active = runtime?.status?.journey_target;
+  const applied = active?.revision === saved.revision;
+  const oldScript = runtime?.running && !("journey_target" in (runtime.status || {}));
+  $("targetBadge").textContent = applied ? "已生效" : oldScript ? "待重启加载" : "已保存";
+  const progress = runtime?.status?.journey_target_state;
+  $("targetSummary").textContent = `${saved.character} · ${saved.combo_code}${applied && progress?.has_partner ? " · 材料已齐" : ""}`;
+  if (oldScript) $("targetResult").textContent = "目标已保存。当前脚本尚未加载此功能，请将游戏切回前台后使用「重启恢复」。";
+}
+
+async function loadJourneyTarget() {
+  try {
+    const data = await api("/api/journey-target");
+    state.targetData = data;
+    state.targetDirty = false;
+    $("targetCharacterList").innerHTML = data.catalog.characters.map((item) => `<option value="${esc(item.name)}"></option>`).join("");
+    $("targetCombo").innerHTML = '<option value="">请选择目标组合</option>' + data.catalog.combos.map((item) => `<option value="${esc(item.code)}">${esc(item.label)}</option>`).join("");
+    $("targetCoverage").textContent = `${data.catalog.coverage} · 核对于 ${data.catalog.verified_at}`;
+    const target = data.target || {};
+    $("targetCharacter").value = target.character || "";
+    $("targetPlaystyle").value = target.playstyle || "pve";
+    $("targetCombo").value = target.combo_code || "";
+    $("targetTrainingDirection").value = target.training_direction || "";
+    $("targetHasPartner").checked = Boolean(data.progress?.has_partner ?? target.has_partner);
+    const setup = target.actual_setup || {};
+    $("setupCharacter").value = setup.character || "";
+    for (const [id, key] of [["setupJourneyRecords", "journey_records"], ["setupSupportCards", "support_cards"]]) {
+      $(id).value = setup[key] ? setup[key].map((item) => item.name).join("\n") || "无" : "";
+    }
+    renderTargetRecommendations();
+    updateTargetCombo();
+    if (data.target) renderTargetCheck(data.precheck);
+    renderTargetApplied(state.runtime);
+  } catch (error) { showToast(`读取旅程目标失败：${error.message}`, true); }
+}
+
+async function checkOrSaveTarget(save = false) {
+  const button = $(save ? "saveTargetBtn" : "precheckTargetBtn");
+  button.disabled = true;
+  try {
+    const result = await api(save ? "/api/journey-target" : "/api/journey-target/precheck", {
+      method: save ? "PUT" : "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(targetForm()),
+    });
+    if (save) {
+      await loadJourneyTarget();
+      showToast("本轮目标已保存");
+    } else renderTargetCheck(result);
+  } catch (error) { showToast(error.message, true); $("targetResult").textContent = error.message; $("targetResult").className = "target-result error"; }
+  finally { button.disabled = false; }
+}
+
+for (const id of ["targetCharacter", "targetPlaystyle", "targetTrainingDirection", "targetHasPartner", "setupCharacter", "setupJourneyRecords", "setupSupportCards"]) {
+  $(id).addEventListener(["targetCharacter", "setupCharacter", "setupJourneyRecords", "setupSupportCards"].includes(id) ? "input" : "change", () => {
+    targetDirty();
+    if (["targetCharacter", "targetPlaystyle"].includes(id)) renderTargetRecommendations();
+  });
+}
+$("targetCombo").addEventListener("change", () => { updateTargetCombo(true); targetDirty(); });
+$("precheckTargetBtn").addEventListener("click", () => checkOrSaveTarget());
+$("saveTargetBtn").addEventListener("click", () => checkOrSaveTarget(true));
+
+function renderJourneyRecord() {
+  const record = state.journeyRecords?.find((item) => item.journey_id === $("journeyRecordSelect").value);
+  state.selectedJourneyRecord = record || null;
+  $("saveJourneyResultBtn").disabled = !record?.outcome.journey_ended || Boolean(state.runtime?.running && state.runtime.status?.journey_id === record?.journey_id);
+  $("scanJourneyInfoBtn").disabled = !record?.outcome.journey_ended || Boolean(state.runtime?.running);
+  $("journeyResultFields").hidden = !record;
+  const scan = record?.latest_screen_scan;
+  const evidenceScreenshot = scan?.screenshot || record?.outcome.final_observation?.screenshot;
+  $("journeyEndScreenshot").hidden = !evidenceScreenshot;
+  $("journeyEndOcr").textContent = (scan?.ocr || record?.outcome.final_observation?.ocr || []).map((item) => item.text).join("\n") || "尚未记录";
+  if (!record) return;
+  const target = record.target_history.at(-1);
+  const sourceNames = { user_declared: "人工填写", screen_confirmed: "已核对画面", unobserved: "未记录" };
+  const setupText = (key) => {
+    const entry = record.actual_setup[key];
+    const value = entry.value;
+    const text = value === null ? "未记录" : Array.isArray(value) ? value.map((item) => item.name).join("、") || "无" : value;
+    return `${text}（${sourceNames[entry.source] || entry.source}）`;
+  };
+  $("journeyRecordSummary").textContent = `${target?.character || "目标未记录"} · ${record.outcome.journey_ended ? "已结束" : "尚未结束"}`;
+  $("journeyRecordInfo").textContent = [`目标：${target ? `${target.character} · ${target.combo_code}` : "未记录"}`,
+    `实际角色：${setupText("character")}`, `旅程记录：${setupText("journey_records")}`, `支援卡：${setupText("support_cards")}`,
+    `运行过程：${record.outcome.execution_mode === "exploration" ? "含未知事件探索" : "正常规则"} · 探索次数：${record.exploration?.attempts || 0}`,
+    `关联运行：${record.segments.length} 次 · 待核对字段：${record.data_quality.missing_fields.length} 项`,
+    ...record.data_quality.warnings].join("\n");
+  $("journeyResultFields").querySelectorAll("[data-final-stat]").forEach((input) => { input.value = record.outcome.final_stats[input.dataset.finalStat].value ?? ""; });
+  $("resultCharacter").value = record.actual_setup.character.value || "";
+  for (const [id, key] of [["resultJourneyRecords", "journey_records"], ["resultSupportCards", "support_cards"]]) {
+    const entries = record.actual_setup[key].value;
+    $(id).value = entries ? entries.map((item) => item.name).join("\n") || "无" : "";
+  }
+  $("resultRank").value = record.outcome.rank.value ?? "";
+  $("resultPotential").value = record.outcome.potential_points.value ?? "";
+  $("resultAppraisal").value = record.outcome.appraisal_result.value || "";
+  const skills = record.outcome.equipped_skills.value;
+  $("resultSkills").value = skills ? skills.join("\n") || "无" : "";
+  if (evidenceScreenshot) $("journeyEndScreenshot").href = `/api/screenshot?path=${encodeURIComponent(evidenceScreenshot)}`;
+  const achieved = record.outcome.target_skill_achieved.value;
+  $("journeyResultMessage").textContent = !record.outcome.journey_ended ? "本轮旅程尚未结束，最终结果保持待核对。" :
+    `目标技能${achieved === null ? "尚未核对" : achieved ? "已达成" : "未达成"}；${record.outcome.execution_mode === "exploration" ? "本轮含探索过程" : "本轮按正常规则完成"}。` +
+    (scan ? `最近一次画面扫描：${formatTime(scan.observed_at)}；仍待核对 ${record.data_quality.missing_fields.length} 项。` : "可读取当前放大镜页面自动补录。");
+}
+
+async function loadJourneyRecords() {
+  try {
+    const data = await api("/api/journey-records");
+    const selected = $("journeyRecordSelect").value;
+    state.journeyRecords = data.records;
+    $("journeyRecordSelect").innerHTML = data.records.length ? data.records.map((record) => {
+      const target = record.target_history.at(-1);
+      return `<option value="${esc(record.journey_id)}">${esc(record.started_at)} · ${esc(target?.character || "角色未记录")} · ${record.outcome.journey_ended ? "已结束" : "未结束"}</option>`;
+    }).join("") : '<option value="">暂无记录</option>';
+    if (data.records.some((item) => item.journey_id === selected)) $("journeyRecordSelect").value = selected;
+    else if (data.records.some((item) => item.journey_id === data.active_journey_id)) $("journeyRecordSelect").value = data.active_journey_id;
+    renderJourneyRecord();
+  } catch (error) { showToast(`读取旅程记录失败：${error.message}`, true); }
+}
+
+async function saveJourneyResult() {
+  const record = state.selectedJourneyRecord;
+  if (!record) return;
+  const body = { final_stats: {}, actual_setup: { character: $("resultCharacter").value.trim() || null } };
+  for (const [id, key] of [["resultJourneyRecords", "journey_records"], ["resultSupportCards", "support_cards"]]) {
+    const names = entryLines($(id).value);
+    const existing = record.actual_setup[key].value;
+    body.actual_setup[key] = existing && JSON.stringify(names) === JSON.stringify(existing.map((item) => item.name)) ? existing : names;
+  }
+  $("journeyResultFields").querySelectorAll("[data-final-stat]").forEach((input) => { if (input.value !== "") body.final_stats[input.dataset.finalStat] = Number(input.value); });
+  for (const [id, key] of [["resultRank", "rank"], ["resultPotential", "potential_points"]]) {
+    if ($(id).value !== "") body[key] = Number($(id).value);
+  }
+  if ($("resultAppraisal").value) body.appraisal_result = $("resultAppraisal").value;
+  const skills = entryLines($("resultSkills").value);
+  if (skills !== null) body.equipped_skills = skills;
+  $("saveJourneyResultBtn").disabled = true;
+  try {
+    await api(`/api/journey-records/${encodeURIComponent(record.journey_id)}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    await loadJourneyRecords();
+    showToast("旅程结果已补录");
+  } catch (error) { $("journeyResultMessage").textContent = error.message; }
+  finally { $("saveJourneyResultBtn").disabled = !record.outcome.journey_ended || Boolean(state.runtime?.running && state.runtime.status?.journey_id === record.journey_id); }
+}
+
+async function scanJourneyInfo() {
+  const record = state.selectedJourneyRecord;
+  if (!record?.outcome.journey_ended) return;
+  const button = $("scanJourneyInfoBtn");
+  button.disabled = true;
+  $("journeyResultMessage").textContent = "正在验证前台游戏并读取旅程信息，请保持放大镜页面不动…";
+  try {
+    const data = await api(`/api/journey-records/${encodeURIComponent(record.journey_id)}/scan-current`, { method: "POST" });
+    await loadJourneyRecords();
+    const setupCount = Object.keys(data.scan?.actual_setup || {}).length;
+    const outcomeCount = Object.keys(data.scan?.outcome || {}).length;
+    showToast(`已读取旅程信息，自动补录 ${setupCount + outcomeCount} 组字段`);
+  } catch (error) {
+    $("journeyResultMessage").textContent = error.message;
+    showToast(`读取旅程信息失败：${error.message}`, true);
+  } finally {
+    if (state.selectedJourneyRecord) button.disabled = !state.selectedJourneyRecord.outcome.journey_ended || Boolean(state.runtime?.running);
+  }
+}
+
+$("journeyRecordSelect").addEventListener("change", renderJourneyRecord);
+$("refreshJourneyRecordsBtn").addEventListener("click", loadJourneyRecords);
+$("scanJourneyInfoBtn").addEventListener("click", scanJourneyInfo);
+$("saveJourneyResultBtn").addEventListener("click", saveJourneyResult);
+
 document.querySelectorAll(".nav-item").forEach((button) => button.addEventListener("click", () => setTab(button.dataset.tab)));
 $("refreshBtn").addEventListener("click", async () => { await loadOverview(); if (state.activeTab === "events") await loadEvents(); showToast("数据已刷新"); });
 $("runControlBtn").addEventListener("click", toggleRuntime);
+$("pauseRuntimeBtn").addEventListener("click", () => sendRuntimeCommand("pause", "脚本已请求暂停"));
+$("resumeRuntimeBtn").addEventListener("click", () => sendRuntimeCommand("resume", "已请求继续，脚本将重新识别"));
+$("stepRuntimeBtn").addEventListener("click", () => sendRuntimeCommand("step", "脚本将处理一个页面后暂停"));
+$("restartRuntimeBtn").addEventListener("click", () => sendRuntimeCommand("restart", "脚本已请求重启恢复"));
+$("inspectRuntimeBtn").addEventListener("click", inspectRuntime);
 $("eventSearch").addEventListener("input", loadEvents);
 $("newEventBtn").addEventListener("click", prepareNewEvent);
-$("updateBranchBtn").addEventListener("click", updateCurrentBranch);
-$("addBranchBtn").addEventListener("click", addBranch);
-$("deleteBranchBtn").addEventListener("click", deleteBranch);
-$("saveEventBtn").addEventListener("click", saveEvent);
 $("saveConfigBtn").addEventListener("click", saveConfig);
 $("copyLogBtn").addEventListener("click", copyLog);
 
 loadOverview();
+loadJourneyTarget();
+loadJourneyRecords();
 setInterval(loadRuntimeStatus, 2000);

@@ -6,6 +6,7 @@ StarSavior 训练自动化机器人 - 主入口
   python main.py --calibrate     # 校准模式（设置模板图片和区域坐标）
   python main.py --debug         # 调试模式：截图+OCR，不执行操作
   python main.py --auto --develop # 开发调试：未知界面持续观察，不因 Unknown 终止
+  python main.py --auto --resume  # 从 runtime/checkpoint.json 重新识别当前界面
   python main.py --simulate      # 决策模拟器：测试AI决策逻辑（无需游戏）
 """
 
@@ -111,6 +112,8 @@ def main():
     modes.add_argument("--auto", action="store_true", help="直接开始训练")
     parser.add_argument("--develop", action="store_true",
                         help="开发调试模式：未知界面不触发卡死终止；正式运行不要使用")
+    parser.add_argument("--resume", action=argparse.BooleanOptionalAction, default=True,
+                        help="默认读取 checkpoint 并重新识别当前界面；--no-resume 忽略历史状态")
     parser.add_argument("--require-game", action="store_true", help="检查时要求找到游戏窗口")
     args = parser.parse_args()
     if args.require_game and not args.check:
@@ -165,10 +168,10 @@ def main():
         simulate(config)
     elif args.auto:
         trainer = Trainer(config, development_mode=args.develop)
-        trainer.run(auto_start=True)
+        trainer.run(auto_start=True, resume=args.resume)
     else:
         trainer = Trainer(config, development_mode=args.develop)
-        trainer.run()
+        trainer.run(resume=args.resume)
 
 
 if __name__ == "__main__":

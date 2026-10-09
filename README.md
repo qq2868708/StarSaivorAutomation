@@ -36,6 +36,9 @@ StarSavior 训练自动化是非官方桌面自动化工具，与《Star Savior�
 - 商店自动购买：物品分类识别 → 条件过滤 → 优先级评分 → 多物品购买
 - 旅程结束检测与自动终止
 - 配置文件驱动，无需修改代码即可切换策略
+- 脚本自身运行控制：暂停、继续、单步、停止
+- 每次输入前后保存 checkpoint：重启后重新识别当前界面，重新决策
+- 安全暂停诊断通道：只有进入 `paused_safe` 后才接受受限 AI 操作
 
 ## 技术栈
 
@@ -44,7 +47,7 @@ StarSavior 训练自动化是非官方桌面自动化工具，与《Star Savior�
 - PaddleOCR（中文 OCR 识别）
 - NumPy（数值计算）
 - PyYAML（配置文件解析）
-- Win32 API（PrintWindow 截图 / SendInput 点击 / PostMessage）
+- Win32 API（PrintWindow 截图 / SendInput 点击）
 
 ## 仓库结构
 
@@ -126,6 +129,31 @@ python ui_app.py
 画面保存到 `logs/screenshots/`；在“运行”页点击历史决策即可回看对应截图。旧日志没有
 截图关联时会明确显示为不可用。修改后分别点击“保存事件”或“保存配置”；下一次脚本
 启动时读取这些文件。
+
+### 5. 运行控制与恢复
+
+运行时状态和恢复数据保存在被 `.gitignore` 忽略的 `runtime/`：
+
+- `status.json`：`running`、`paused_manual`、`paused_safe`、`journey_end` 等状态
+- `checkpoint.json`：回合、当前界面指纹、最后动作和截图引用
+- `commands/` 和 `acks/`：本地命令队列和命令执行结果
+- `events.jsonl`：截图、识别、决策、点击、异常、暂停、恢复、旅程结束等事件
+- `screenshots/`：输入前和安全暂停时的游戏截图
+
+WebUI 的运行页提供暂停、继续、单步处理、重启恢复和现场截图。单步处理指执行一次
+页面 Handler 流程，流程可能包含多次点击。暂停/停止命令在下一次截图或输入前生效，
+已经按下的鼠标/键盘会先释放；继续时退出旧流程，重新识别当前界面。脚本启动默认
+读取 checkpoint；`--no-resume` 可以忽略历史状态。checkpoint 不会重放点击。
+
+正常自动运行、页面识别、重启后的恢复由脚本完成，不需要 AI。当前 Handler 链覆盖的
+训练、休息、事件、商店、评鉴战、剧情和结算页面会重新匹配对应处理器；无法识别的
+窗口会安全暂停，等待补充识别规则。结束页交还人工，不自动开始下一局。
+
+未知界面持续未识别、输入失焦、超时或异常会进入 `paused_safe`，保存截图、OCR 和
+诊断上下文。AI 必须先注册本次暂停的客户端会话，才能通过
+`POST /api/runtime/ai-action` 请求检查、一次点击、继续或停止。正常运行、手动暂停、
+过期会话或过时画面都会拒绝 AI 点击；没有 AI 时保持暂停等待人工。
+详细协议和示例见 [运行与接管协议](docs/runtime-control.md)。
 
 ## Handler 优先级链
 

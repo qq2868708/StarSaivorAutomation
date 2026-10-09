@@ -1,0 +1,710 @@
+{
+  "schema_version": 1,
+  "verified_at": "2026-10-08",
+  "source_document": "https://docs.qq.com/sheet/DZkh2QmxKdnJUaVpw?tab=lzqghu",
+  "character_document": "https://docs.qq.com/sheet/DZkh2QmxKdnJUaVpw?tab=6chp1a",
+  "coverage": "64 个普通组合、3 个特殊技能；角色推荐已核对格温、M教授、阿莫拉、克莉丝特。其他角色允许手动输入。",
+  "direction_note": "脚本根据目标组合的起始装备类型自动选择三月声援分组：攻击/暴击/爆伤对应攻击向，生命/防御/速度对应生存向，命中/抗性对应综合向，特殊技能对应战术向。分组依据装备页图片；角色推荐中的多个组合为可选方案。",
+  "materials": [
+    "攻击",
+    "生命",
+    "防御",
+    "速度",
+    "暴击",
+    "爆伤",
+    "命中",
+    "抗性"
+  ],
+  "combos": [
+    {
+      "code": "AX1",
+      "label": "AX1（攻击+攻击）",
+      "initial_material": "攻击",
+      "partner_material": "攻击",
+      "effect_text": "攻击力+12%\n每回合开始时攻击力提高8%（最多叠加5层）。使用爆发技后重置叠加层数",
+      "source_cells": "B8,H8",
+      "event_direction": "attack"
+    },
+    {
+      "code": "AX2",
+      "label": "AX2（攻击+生命）",
+      "initial_material": "攻击",
+      "partner_material": "生命",
+      "effect_text": "攻击力+8%，生命值+4%\n每回合开始时攻击力提高8%（最多叠加5层）。使用爆发技后重置叠加层数",
+      "source_cells": "B9,H9",
+      "event_direction": "attack"
+    },
+    {
+      "code": "AX3",
+      "label": "AX3（攻击+防御）",
+      "initial_material": "攻击",
+      "partner_material": "防御",
+      "effect_text": "攻击力+8%，防御力+6%\n每回合开始时攻击力提高8%（最多叠加5层）。使用爆发技后重置叠加层数",
+      "source_cells": "B10,H10",
+      "event_direction": "attack"
+    },
+    {
+      "code": "AX4",
+      "label": "AX4（攻击+速度）",
+      "initial_material": "攻击",
+      "partner_material": "速度",
+      "effect_text": "攻击力+8%，速度+4\n每回合开始时攻击力提高8%（最多叠加5层）。使用爆发技后重置叠加层数",
+      "source_cells": "B11,H11",
+      "event_direction": "attack"
+    },
+    {
+      "code": "AX5",
+      "label": "AX5（攻击+暴击）",
+      "initial_material": "攻击",
+      "partner_material": "暴击",
+      "effect_text": "攻击力+8%，暴击率+5%\n每回合开始时攻击力提高8%（最多叠加5层）。使用爆发技后重置叠加层数",
+      "source_cells": "B12,H12",
+      "event_direction": "attack"
+    },
+    {
+      "code": "AX6",
+      "label": "AX6（攻击+爆伤）",
+      "initial_material": "攻击",
+      "partner_material": "爆伤",
+      "effect_text": "攻击力+8%，暴击伤害+5%\n每回合开始时攻击力提高8%（最多叠加5层）。使用爆发技后重置叠加层数",
+      "source_cells": "B13,H13",
+      "event_direction": "attack"
+    },
+    {
+      "code": "AX7",
+      "label": "AX7（攻击+命中）",
+      "initial_material": "攻击",
+      "partner_material": "命中",
+      "effect_text": "攻击力+8%，效果命中+8%\n每回合开始时攻击力提高8%（最多叠加5层）。使用爆发技后重置叠加层数",
+      "source_cells": "B14,H14",
+      "event_direction": "attack"
+    },
+    {
+      "code": "AX8",
+      "label": "AX8（攻击+抗性）",
+      "initial_material": "攻击",
+      "partner_material": "抗性",
+      "effect_text": "攻击力+8%，效果抗性+8%\n每回合开始时攻击力提高8%（最多叠加5层）。使用爆发技后重置叠加层数",
+      "source_cells": "B15,H15",
+      "event_direction": "attack"
+    },
+    {
+      "code": "BX1",
+      "label": "BX1（生命+攻击）",
+      "initial_material": "生命",
+      "partner_material": "攻击",
+      "effect_text": "生命值+8%，攻击力+4%\n受到攻击后有25%的几率恢复生命值；恢复量与你的最大生命值成正比。",
+      "source_cells": "B17,H17",
+      "event_direction": "survival"
+    },
+    {
+      "code": "BX2",
+      "label": "BX2（生命+生命）",
+      "initial_material": "生命",
+      "partner_material": "生命",
+      "effect_text": "生命值+12%\n受到攻击后有25%的几率恢复生命值；恢复量与你的最大生命值成正比。",
+      "source_cells": "B18,H18",
+      "event_direction": "survival"
+    },
+    {
+      "code": "BX3",
+      "label": "BX3（生命+防御）",
+      "initial_material": "生命",
+      "partner_material": "防御",
+      "effect_text": "生命值+8%，防御力+6%\n受到攻击后有25%的几率恢复生命值；恢复量与你的最大生命值成正比。",
+      "source_cells": "B19,H19",
+      "event_direction": "survival"
+    },
+    {
+      "code": "BX4",
+      "label": "BX4（生命+速度）",
+      "initial_material": "生命",
+      "partner_material": "速度",
+      "effect_text": "生命值+8%，速度+4\n受到攻击后有25%的几率恢复生命值；恢复量与你的最大生命值成正比。",
+      "source_cells": "B20,H20",
+      "event_direction": "survival"
+    },
+    {
+      "code": "BX5",
+      "label": "BX5（生命+暴击）",
+      "initial_material": "生命",
+      "partner_material": "暴击",
+      "effect_text": "生命值+8%，暴击率+5%\n受到攻击后有25%的几率恢复生命值；恢复量与你的最大生命值成正比。",
+      "source_cells": "B21,H21",
+      "event_direction": "survival"
+    },
+    {
+      "code": "BX6",
+      "label": "BX6（生命+爆伤）",
+      "initial_material": "生命",
+      "partner_material": "爆伤",
+      "effect_text": "生命值+8%，暴击伤害+5%\n受到攻击后有25%的几率恢复生命值；恢复量与你的最大生命值成正比。",
+      "source_cells": "B22,H22",
+      "event_direction": "survival"
+    },
+    {
+      "code": "BX7",
+      "label": "BX7（生命+命中）",
+      "initial_material": "生命",
+      "partner_material": "命中",
+      "effect_text": "生命值+8%，效果命中+8%\n受到攻击后有25%的几率恢复生命值；恢复量与你的最大生命值成正比。",
+      "source_cells": "B23,H23",
+      "event_direction": "survival"
+    },
+    {
+      "code": "BX8",
+      "label": "BX8（生命+抗性）",
+      "initial_material": "生命",
+      "partner_material": "抗性",
+      "effect_text": "生命值+8%，效果抗性+8%\n受到攻击后有25%的几率恢复生命值；恢复量与你的最大生命值成正比。",
+      "source_cells": "B24,H24",
+      "event_direction": "survival"
+    },
+    {
+      "code": "CX1",
+      "label": "CX1（防御+攻击）",
+      "initial_material": "防御",
+      "partner_material": "攻击",
+      "effect_text": "防御力+12%，攻击力+4%\n受到攻击时防御力提升10%，最多可叠加5层，攻击后叠加层数重置。",
+      "source_cells": "B26,H26",
+      "event_direction": "survival"
+    },
+    {
+      "code": "CX2",
+      "label": "CX2（防御+生命）",
+      "initial_material": "防御",
+      "partner_material": "生命",
+      "effect_text": "防御力+12%，生命值+4%\n受到攻击时防御力提升10%，最多可叠加5层，攻击后叠加层数重置。",
+      "source_cells": "B27,H27",
+      "event_direction": "survival"
+    },
+    {
+      "code": "CX3",
+      "label": "CX3（防御+防御）",
+      "initial_material": "防御",
+      "partner_material": "防御",
+      "effect_text": "防御力+18%\n受到攻击时防御力提升10%，最多可叠加5层，攻击后叠加层数重置。",
+      "source_cells": "B28,H28",
+      "event_direction": "survival"
+    },
+    {
+      "code": "CX4",
+      "label": "CX4（防御+速度）",
+      "initial_material": "防御",
+      "partner_material": "速度",
+      "effect_text": "防御力+12%，速度+4\n受到攻击时防御力提升10%，最多可叠加5层，攻击后叠加层数重置。",
+      "source_cells": "B29,H29",
+      "event_direction": "survival"
+    },
+    {
+      "code": "CX5",
+      "label": "CX5（防御+暴击）",
+      "initial_material": "防御",
+      "partner_material": "暴击",
+      "effect_text": "防御力+12%，暴击率+5%\n受到攻击时防御力提升10%，最多可叠加5层，攻击后叠加层数重置。",
+      "source_cells": "B30,H30",
+      "event_direction": "survival"
+    },
+    {
+      "code": "CX6",
+      "label": "CX6（防御+爆伤）",
+      "initial_material": "防御",
+      "partner_material": "爆伤",
+      "effect_text": "防御力+12%，暴击伤害+5%\n受到攻击时防御力提升10%，最多可叠加5层，攻击后叠加层数重置。",
+      "source_cells": "B31,H31",
+      "event_direction": "survival"
+    },
+    {
+      "code": "CX7",
+      "label": "CX7（防御+命中）",
+      "initial_material": "防御",
+      "partner_material": "命中",
+      "effect_text": "防御力+12%，效果命中+8%\n受到攻击时防御力提升10%，最多可叠加5层，攻击后叠加层数重置。",
+      "source_cells": "B32,H32",
+      "event_direction": "survival"
+    },
+    {
+      "code": "CX8",
+      "label": "CX8（防御+抗性）",
+      "initial_material": "防御",
+      "partner_material": "抗性",
+      "effect_text": "防御力+12%，效果抵抗+8%\n受到攻击时防御力提升10%，最多可叠加5层，攻击后叠加层数重置。",
+      "source_cells": "B33,H33",
+      "event_direction": "survival"
+    },
+    {
+      "code": "DX1",
+      "label": "DX1（速度+攻击）",
+      "initial_material": "速度",
+      "partner_material": "攻击",
+      "effect_text": "速度+8，攻击力+4%\n使用普通攻击后有25%的几率增加10%的行动条（每回合只能触发一次）",
+      "source_cells": "B35,H35",
+      "event_direction": "survival"
+    },
+    {
+      "code": "DX2",
+      "label": "DX2（速度+生命）",
+      "initial_material": "速度",
+      "partner_material": "生命",
+      "effect_text": "速度+8，生命值+4%\n使用普通攻击后有25%的几率增加10%的行动条（每回合只能触发一次）",
+      "source_cells": "B36,H36",
+      "event_direction": "survival"
+    },
+    {
+      "code": "DX3",
+      "label": "DX3（速度+防御）",
+      "initial_material": "速度",
+      "partner_material": "防御",
+      "effect_text": "速度+8，防御力+6%\n使用普通攻击后有25%的几率增加10%的行动条（每回合只能触发一次）",
+      "source_cells": "B37,H37",
+      "event_direction": "survival"
+    },
+    {
+      "code": "DX4",
+      "label": "DX4（速度+速度）",
+      "initial_material": "速度",
+      "partner_material": "速度",
+      "effect_text": "速度+12\n使用普通攻击后有25%的几率增加10%的行动条（每回合只能触发一次）",
+      "source_cells": "B38,H38",
+      "event_direction": "survival"
+    },
+    {
+      "code": "DX5",
+      "label": "DX5（速度+暴击）",
+      "initial_material": "速度",
+      "partner_material": "暴击",
+      "effect_text": "速度+8，暴击率+5%\n使用普通攻击后有25%的几率增加10%的行动条（每回合只能触发一次）",
+      "source_cells": "B39,H39",
+      "event_direction": "survival"
+    },
+    {
+      "code": "DX6",
+      "label": "DX6（速度+爆伤）",
+      "initial_material": "速度",
+      "partner_material": "爆伤",
+      "effect_text": "速度+8，暴击伤害+5%\n使用普通攻击后有25%的几率增加10%的行动条（每回合只能触发一次）",
+      "source_cells": "B40,H40",
+      "event_direction": "survival"
+    },
+    {
+      "code": "DX7",
+      "label": "DX7（速度+命中）",
+      "initial_material": "速度",
+      "partner_material": "命中",
+      "effect_text": "速度+8，效果命中+8%\n使用普通攻击后有25%的几率增加10%的行动条（每回合只能触发一次）",
+      "source_cells": "B41,H41",
+      "event_direction": "survival"
+    },
+    {
+      "code": "DX8",
+      "label": "DX8（速度+抗性）",
+      "initial_material": "速度",
+      "partner_material": "抗性",
+      "effect_text": "速度+8，效果抵抗+8%\n使用普通攻击后有25%的几率增加10%的行动条（每回合只能触发一次）",
+      "source_cells": "B42,H42",
+      "event_direction": "survival"
+    },
+    {
+      "code": "EX1",
+      "label": "EX1（暴击+攻击）",
+      "initial_material": "暴击",
+      "partner_material": "攻击",
+      "effect_text": "暴击率+10%，攻击力+4%\n普通攻击造成暴击时，有25%的几率触发一名随机友军对随机目标进行普通攻击。",
+      "source_cells": "B44,H44",
+      "event_direction": "attack"
+    },
+    {
+      "code": "EX2",
+      "label": "EX2（暴击+生命）",
+      "initial_material": "暴击",
+      "partner_material": "生命",
+      "effect_text": "暴击率+10%，生命值+4%\n普通攻击造成暴击时，有25%的几率触发一名随机友军对随机目标进行普通攻击。",
+      "source_cells": "B45,H45",
+      "event_direction": "attack"
+    },
+    {
+      "code": "EX3",
+      "label": "EX3（暴击+防御）",
+      "initial_material": "暴击",
+      "partner_material": "防御",
+      "effect_text": "暴击率+10%，防御力+6%\n普通攻击造成暴击时，有25%的几率触发一名随机友军对随机目标进行普通攻击。",
+      "source_cells": "B46,H46",
+      "event_direction": "attack"
+    },
+    {
+      "code": "EX4",
+      "label": "EX4（暴击+速度）",
+      "initial_material": "暴击",
+      "partner_material": "速度",
+      "effect_text": "暴击率+10%，速度+4\n普通攻击造成暴击时，有25%的几率触发一名随机友军对随机目标进行普通攻击。",
+      "source_cells": "B47,H47",
+      "event_direction": "attack"
+    },
+    {
+      "code": "EX5",
+      "label": "EX5（暴击+暴击）",
+      "initial_material": "暴击",
+      "partner_material": "暴击",
+      "effect_text": "暴击率+15%\n普通攻击造成暴击时，有25%的几率触发一名随机友军对随机目标进行普通攻击。",
+      "source_cells": "B48,H48",
+      "event_direction": "attack"
+    },
+    {
+      "code": "EX6",
+      "label": "EX6（暴击+爆伤）",
+      "initial_material": "暴击",
+      "partner_material": "爆伤",
+      "effect_text": "暴击率+10%，暴击伤害5%\n普通攻击造成暴击时，有25%的几率触发一名随机友军对随机目标进行普通攻击。",
+      "source_cells": "B49,H49",
+      "event_direction": "attack"
+    },
+    {
+      "code": "EX7",
+      "label": "EX7（暴击+命中）",
+      "initial_material": "暴击",
+      "partner_material": "命中",
+      "effect_text": "暴击率+10%，效果命中+8%\n普通攻击造成暴击时，有25%的几率触发一名随机友军对随机目标进行普通攻击。",
+      "source_cells": "B50,H50",
+      "event_direction": "attack"
+    },
+    {
+      "code": "EX8",
+      "label": "EX8（暴击+抗性）",
+      "initial_material": "暴击",
+      "partner_material": "抗性",
+      "effect_text": "暴击率+10%，效果抗性+8%\n普通攻击造成暴击时，有25%的几率触发一名随机友军对随机目标进行普通攻击。",
+      "source_cells": "B51,H51",
+      "event_direction": "attack"
+    },
+    {
+      "code": "FX1",
+      "label": "FX1（爆伤+攻击）",
+      "initial_material": "爆伤",
+      "partner_material": "攻击",
+      "effect_text": "暴击伤害+10%，攻击力+4%\n发生暴击时，下一次攻击造成的伤害增加25%。",
+      "source_cells": "B53,H53",
+      "event_direction": "attack"
+    },
+    {
+      "code": "FX2",
+      "label": "FX2（爆伤+生命）",
+      "initial_material": "爆伤",
+      "partner_material": "生命",
+      "effect_text": "暴击伤害+10%，生命值+4%\n发生暴击时，下一次攻击造成的伤害增加25%。",
+      "source_cells": "B54,H54",
+      "event_direction": "attack"
+    },
+    {
+      "code": "FX3",
+      "label": "FX3（爆伤+防御）",
+      "initial_material": "爆伤",
+      "partner_material": "防御",
+      "effect_text": "暴击伤害+10%，防御力+6%\n发生暴击时，下一次攻击造成的伤害增加25%。",
+      "source_cells": "B55,H55",
+      "event_direction": "attack"
+    },
+    {
+      "code": "FX4",
+      "label": "FX4（爆伤+速度）",
+      "initial_material": "爆伤",
+      "partner_material": "速度",
+      "effect_text": "暴击伤害+10%，速度+4\n发生暴击时，下一次攻击造成的伤害增加25%。",
+      "source_cells": "B56,H56",
+      "event_direction": "attack"
+    },
+    {
+      "code": "FX5",
+      "label": "FX5（爆伤+暴击）",
+      "initial_material": "爆伤",
+      "partner_material": "暴击",
+      "effect_text": "暴击伤害+10%，暴击率+5%\n发生暴击时，下一次攻击造成的伤害增加25%。",
+      "source_cells": "B57,H57",
+      "event_direction": "attack"
+    },
+    {
+      "code": "FX6",
+      "label": "FX6（爆伤+爆伤）",
+      "initial_material": "爆伤",
+      "partner_material": "爆伤",
+      "effect_text": "暴击伤害+15%\n发生暴击时，下一次攻击造成的伤害增加25%。",
+      "source_cells": "B58,H58",
+      "event_direction": "attack"
+    },
+    {
+      "code": "FX7",
+      "label": "FX7（爆伤+命中）",
+      "initial_material": "爆伤",
+      "partner_material": "命中",
+      "effect_text": "暴击伤害+10%，效果命中+8%\n发生暴击时，下一次攻击造成的伤害增加25%。",
+      "source_cells": "B59,H59",
+      "event_direction": "attack"
+    },
+    {
+      "code": "FX8",
+      "label": "FX8（爆伤+抗性）",
+      "initial_material": "爆伤",
+      "partner_material": "抗性",
+      "effect_text": "暴击伤害+10%，效果命中+8%\n发生暴击时，下一次攻击造成的伤害增加25%。",
+      "source_cells": "B60,H60",
+      "note": "FX8 的数值按表格原文保留；原文效果命中与组合名抗性不一致，不据此推断装备属性。",
+      "event_direction": "attack"
+    },
+    {
+      "code": "GX1",
+      "label": "GX1（命中+攻击）",
+      "initial_material": "命中",
+      "partner_material": "攻击",
+      "effect_text": "效果命中+16%，攻击力+4%\n普攻攻击命中后，有50%的几率使目标流血2回合。",
+      "source_cells": "B62,H62",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "GX2",
+      "label": "GX2（命中+生命）",
+      "initial_material": "命中",
+      "partner_material": "生命",
+      "effect_text": "效果命中+16%，生命值+4%\n普攻攻击命中后，有50%的几率使目标流血2回合。",
+      "source_cells": "B63,H63",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "GX3",
+      "label": "GX3（命中+防御）",
+      "initial_material": "命中",
+      "partner_material": "防御",
+      "effect_text": "效果命中+16%，防御力+6%\n普攻攻击命中后，有50%的几率使目标流血2回合。",
+      "source_cells": "B64,H64",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "GX4",
+      "label": "GX4（命中+速度）",
+      "initial_material": "命中",
+      "partner_material": "速度",
+      "effect_text": "效果命中+16%，速度+4\n普攻攻击命中后，有50%的几率使目标流血2回合。",
+      "source_cells": "B65,H65",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "GX5",
+      "label": "GX5（命中+暴击）",
+      "initial_material": "命中",
+      "partner_material": "暴击",
+      "effect_text": "效果命中+16%，暴击率+5%\n普攻攻击命中后，有50%的几率使目标流血2回合。",
+      "source_cells": "B66,H66",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "GX6",
+      "label": "GX6（命中+爆伤）",
+      "initial_material": "命中",
+      "partner_material": "爆伤",
+      "effect_text": "效果命中+16%，暴击伤害+5%\n普攻攻击命中后，有50%的几率使目标流血2回合。",
+      "source_cells": "B67,H67",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "GX7",
+      "label": "GX7（命中+命中）",
+      "initial_material": "命中",
+      "partner_material": "命中",
+      "effect_text": "效果命中+24%\n普攻攻击命中后，有50%的几率使目标流血2回合。",
+      "source_cells": "B68,H68",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "GX8",
+      "label": "GX8（命中+抗性）",
+      "initial_material": "命中",
+      "partner_material": "抗性",
+      "effect_text": "效果命中+16%，效果抗性+8%\n普攻攻击命中后，有50%的几率使目标流血2回合。",
+      "source_cells": "B69,H69",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "HX1",
+      "label": "HX1（抗性+攻击）",
+      "initial_material": "抗性",
+      "partner_material": "攻击",
+      "effect_text": "效果抗性+16%，攻击力+4%\n受到单次攻击时，若你未处于减益状态，则有50%的几率对攻击者造成连锁伤害；伤害值与你的最大生命值成正比",
+      "source_cells": "B71,H71",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "HX2",
+      "label": "HX2（抗性+生命）",
+      "initial_material": "抗性",
+      "partner_material": "生命",
+      "effect_text": "效果抗性+16%，生命值+4%\n受到单次攻击时，若你未处于减益状态，则有50%的几率对攻击者造成连锁伤害；伤害值与你的最大生命值成正比",
+      "source_cells": "B72,H72",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "HX3",
+      "label": "HX3（抗性+防御）",
+      "initial_material": "抗性",
+      "partner_material": "防御",
+      "effect_text": "效果抗性+16%，防御力+6%\n受到单次攻击时，若你未处于减益状态，则有50%的几率对攻击者造成连锁伤害；伤害值与你的最大生命值成正比",
+      "source_cells": "B73,H73",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "HX4",
+      "label": "HX4（抗性+速度）",
+      "initial_material": "抗性",
+      "partner_material": "速度",
+      "effect_text": "效果抗性+16%，速度+4\n受到单次攻击时，若你未处于减益状态，则有50%的几率对攻击者造成连锁伤害；伤害值与你的最大生命值成正比",
+      "source_cells": "B74,H74",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "HX5",
+      "label": "HX5（抗性+暴击）",
+      "initial_material": "抗性",
+      "partner_material": "暴击",
+      "effect_text": "效果抗性+16%，暴击率+5%\n受到单次攻击时，若你未处于减益状态，则有50%的几率对攻击者造成连锁伤害；伤害值与你的最大生命值成正比",
+      "source_cells": "B75,H75",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "HX6",
+      "label": "HX6（抗性+爆伤）",
+      "initial_material": "抗性",
+      "partner_material": "爆伤",
+      "effect_text": "效果抗性+16%，暴击伤害+5%\n受到单次攻击时，若你未处于减益状态，则有50%的几率对攻击者造成连锁伤害；伤害值与你的最大生命值成正比",
+      "source_cells": "B76,H76",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "HX7",
+      "label": "HX7（抗性+命中）",
+      "initial_material": "抗性",
+      "partner_material": "命中",
+      "effect_text": "效果抗性+16%，效果命中+8%\n受到单次攻击时，若你未处于减益状态，则有50%的几率对攻击者造成连锁伤害；伤害值与你的最大生命值成正比",
+      "source_cells": "B77,H77",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "HX8",
+      "label": "HX8（抗性+抗性）",
+      "initial_material": "抗性",
+      "partner_material": "抗性",
+      "effect_text": "效果抗性+24%\n受到单次攻击时，若你未处于减益状态，则有50%的几率对攻击者造成连锁伤害；伤害值与你的最大生命值成正比",
+      "source_cells": "B78,H78",
+      "event_direction": "comprehensive"
+    },
+    {
+      "code": "XX1",
+      "label": "XX1（反击）",
+      "initial_material": null,
+      "partner_material": "反击",
+      "special": true,
+      "effect_text": "反击几率+20%",
+      "source_cells": "D6",
+      "event_direction": "tactical"
+    },
+    {
+      "code": "XX2",
+      "label": "XX2（吸血）",
+      "initial_material": null,
+      "partner_material": "吸血",
+      "special": true,
+      "effect_text": "吸血+15%",
+      "source_cells": "F6",
+      "event_direction": "tactical"
+    },
+    {
+      "code": "XX3",
+      "label": "XX3（韧性）",
+      "initial_material": null,
+      "partner_material": "韧性",
+      "special": true,
+      "effect_text": "最大韧性+3",
+      "source_cells": "H6",
+      "event_direction": "tactical"
+    }
+  ],
+  "characters": [
+    {
+      "name": "格温",
+      "aliases": [
+        "克温",
+        "格温/克温"
+      ],
+      "source_row": 6,
+      "recommendations": {
+        "pve": [
+          "AX5",
+          "AX1"
+        ],
+        "pvp": [
+          "AX5",
+          "DX4"
+        ],
+        "cosmos": [
+          "AX5",
+          "AX1"
+        ]
+      }
+    },
+    {
+      "name": "M教授",
+      "aliases": [
+        "M 教授"
+      ],
+      "source_row": 26,
+      "recommendations": {
+        "pve": [
+          "AX5",
+          "AX1"
+        ],
+        "pvp": [
+          "AX5",
+          "DX4"
+        ],
+        "cosmos": [
+          "AX5",
+          "AX1"
+        ]
+      }
+    },
+    {
+      "name": "阿莫拉",
+      "aliases": [],
+      "source_row": 46,
+      "recommendations": {
+        "pve": [
+          "AX5",
+          "AX1"
+        ],
+        "pvp": [
+          "AX5",
+          "AX1"
+        ],
+        "cosmos": [
+          "AX5",
+          "AX1"
+        ]
+      }
+    },
+    {
+      "name": "克莉丝特",
+      "aliases": [],
+      "source_row": 66,
+      "recommendations": {
+        "pve": [
+          "AX1",
+          "GX7"
+        ],
+        "pvp": [
+          "AX1",
+          "GX7"
+        ],
+        "cosmos": [
+          "AX1",
+          "GX7"
+        ]
+      }
+    }
+  ]
+}

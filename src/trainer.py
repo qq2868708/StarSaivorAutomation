@@ -3,7 +3,7 @@
 
 核心改进 (v5.0):
   - 后台窗口截图 (PrintWindow/BitBlt), 窗口被遮挡也能工作
-  - 后台点击 (PostMessage), 不移动实际鼠标光标
+  - SendInput 点击，执行前校验游戏窗口并恢复鼠标位置
   - 处理器优先级链: Skip → Event → Training → Rest → MainMenu → Unknown
   - 自适应轮询: 连续未命中时渐进延长等待时间
   - 训练后自动点击推进加载/结算画面
@@ -31,6 +31,7 @@ import numpy as np
 
 from .capture import ScreenCapture
 from .controller import Controller, InputTargetError
+from .journey_target import JourneyTargetPending
 from .recognition import GameUI, OCREngine, GameStateReader, ScreenDetector
 from .decision import DecisionEngine, TrainingOption, GameState
 from .rule_engine import (
@@ -79,6 +80,8 @@ from .handlers import (
 )
 from .arcanum import ArcanumDetector, calibrate_arcanum
 from .logger import RunLogger
+from .runtime_control import RuntimeInterrupt
+from .runtime_session import RuntimeSession, SafePauseError
 
 
 # ============================================================
@@ -216,7 +219,7 @@ class TrainingMetricScanState:
 # Trainer 主类
 # ============================================================
 
-class Trainer:
+class Trainer(RuntimeSession):
     def __init__(self, config, development_mode=False):
         self.config = config
         # 开发阶段允许 UnknownHandler 持续观察并收集现场；正式运行默认
@@ -256,7 +259,6 @@ class Trainer:
             profile_name=profile_name,
             build_direction=build_dir,
         )
-
         # 状态缓存
         self._last_stamina: Optional[float] = None
         self._last_mood: str = "Normal"
@@ -348,236 +350,165 @@ class Trainer:
             "保护": target_cfg.get("guard", 0) or 0,
         }
         self._target_stats_enabled = any(v > 0 for v in self._target_stats.values())
+        self._runtime_init()
 
     # ===================== 主循环 =====================
 
-    def run(self, auto_start=False):
+    def run(self, auto_start=False, resume=True):
         if not auto_start and not sys.stdin.isatty():
-            raise RuntimeError("请通过启动训练.bat 在交互窗口运行；环境检查使用 --check")
-        mode = "规则引擎" if self.engine.is_rule_engine_mode else "传统权重"
-        print("\n" + "=" * 60)
-        print(f"  StarSavior 训练自动化机器人 v5.0")
-        print(f"  决策模式: {mode}")
-        print(f"  截图方式: PrintWindow；黑屏时使用前台客户区截图")
-        print(f"  点击方式: SendInput (硬件级, 保存恢复光标)")
-        if self.engine.is_rule_engine_mode:
-            print(f"  规则配置: {self.engine.rule_profile_name}")
-            s = self.engine.rule_profile.legacy_strategy
-            print(f"  构建方向: {s.build_direction.value}, "
-                  f"失败率阈值={s.fail_rate_threshold}%, rush={s.rush_threshold}")
-        scan_labels = {"fast": "快速(1行)", "normal": "普通(3行)", "focus": "专注(5行全扫)"}
-        label = scan_labels.get(self._scan_mode, self._scan_mode)
-        print(f"  扫描模式: {label}")
-        print(f"  优势训练: 蓝色大拇指标记 ×{self._advantage_multiplier:.2f}")
-        print(f"  未知界面模式: {'开发持续观察' if self._development_mode else '正式安全暂停'}")
-        if self.engine.use_icon_counting and self._icon_priority_limit > 0:
-            print(f"  图标优先: 前{self._icon_priority_limit}回合 (羁绊优先)")
-        print("=" * 60)
-
-        region = self.capture.find_window()
-        if region is None:
-            raise RuntimeError("无法找到 StarSavior 游戏窗口，请先打开游戏并进入旅程")
-
-        self.controller.set_game_region(region)
-        self.controller.set_window_handle(self.capture.get_hwnd())
-        print(f"[信息] 游戏窗口: {region[2]}x{region[3]}")
-
-        self._print_config()
-
-        # 属性目标确认 (始终询问用户输入期望值)
-        print("\n--- 属性目标 (训练评分降权用) ---")
-        if self._target_stats_enabled:
-            for name, val in self._target_stats.items():
-                status = "(目标)" if val > 0 else "(无限制)"
-                print(f"  {name}: {val} {status}")
-        else:
-            print("  尚未设置目标值, 训练评分将不启用目标接近降权")
-        if not auto_start and sys.stdin.isatty():
-            try:
-                resp = input("\n输入各属性期望值 (如 力量=500 体力=400) 或按 Enter 跳过: ").strip()
-                while resp:
-                    for part in resp.split():
-                        if "=" in part:
-                            k, v = part.split("=", 1)
-                            for name in _STAT_NAMES:
-                                if k in name:
-                                    try:
-                                        self._target_stats[name] = int(v)
-                                        print(f"  {name} → {v}")
-                                    except ValueError:
-                                        pass
-                                    break
-                    resp = input("继续修改? (Enter 完成): ").strip()
-                self._target_stats_enabled = any(v > 0 for v in self._target_stats.values())
-                if self._target_stats_enabled:
-                    print("  目标已保存:")
-                    for name, val in self._target_stats.items():
-                        if val > 0:
-                            print(f"    {name}: {val}")
-                else:
-                    print("  未设置目标, 跳过目标接近降权")
-            except EOFError:
-                print("  [跳过] 非交互环境, 使用配置文件中的目标值")
-
-        if not auto_start and sys.stdin.isatty():
-            try:
-                input("\n按 Enter 开始训练...")
-            except EOFError:
-                pass
-        else:
-            print("\n[自动] 直接开始训练...")
-
-        preload_profiles()
-        self.controller.focus_game_window()
-
+            raise RuntimeError("非交互运行请使用 --auto")
+        if not auto_start:
+            input("按 Enter 开始自动化，Ctrl+C 停止...")
+        # CLI and WebUI share an OS lock. No second process may send game input.
+        self.runtime.acquire()
+        self._runtime_active = True
+        self.capture.before_capture = self._runtime_poll
+        self.capture.after_capture = self._on_runtime_frame
+        self.controller.before_action = self._before_input
+        self.controller.after_action = self._after_input
+        self.controller.poll_control = self._runtime_poll
+        self._runtime_started = time.monotonic()
         try:
-            while self.max_rounds == 0 or self.round_count < self.max_rounds:
-                self.round_count += 1
-                self._round_start_time = time.time()
-                self._last_handler_name = ""
-                self._same_handler_count = 0
-                # 商店的已交易状态随评鉴战流程结束重置，不能每轮清空。
-                turn_info = f" T{self._handler_ctx.detected_turn}/45" if self._handler_ctx.detected_turn is not None else ""
-                print(f"\n--- 第{self.round_count}轮{turn_info} ---")
-                self.logger.start_turn_timing()
-
-                # --- 超时检查 ---
-                elapsed = time.time() - self.logger._start_time
-                if elapsed > self._max_runtime_seconds:
-                    print(f"\n[保护] 超时 ({elapsed / 60:.1f}min > {self._max_runtime_seconds / 60:.0f}min), 触发分析...")
-                    self._exit_reason = "timeout"
+            self.runtime.clear_pending_command()
+            self._runtime_status("starting")
+            self._print_config()
+            preload_profiles()
+            if resume:
+                self._load_resume_checkpoint()
+            while True:
+                if self._wait_for_runtime():
                     break
-
-                # --- 卡死检查1: 连续 UnknownHandler 轮数 ---
-                if self._consecutive_unknown >= self._stuck_threshold and not self._development_mode:
-                    print(f"\n[保护] 连续{self._consecutive_unknown}轮Unknown (卡死), 触发分析...")
-                    self._exit_reason = "stuck"
-                    path = self._save_stuck_screenshot()
-                    self._trigger_stuck_analysis("连续UnknownHandler卡死", path)
+                if self.max_rounds > 0 and self.round_count >= self.max_rounds:
+                    self._exit_reason = "max_rounds"
                     break
-
-                # --- 卡死检查2: 全局每轮超时 (任何handler都可能卡住) ---
-                round_elapsed = time.time() - self._round_start_time
-                if (self._round_start_time > 0 and round_elapsed > self._round_timeout_seconds
-                        and not (self._development_mode and self._consecutive_unknown > 0)):
-                    print(f"\n[保护] 轮超时 ({round_elapsed:.0f}s > {self._round_timeout_seconds}s), 触发分析...")
-                    self._exit_reason = "stuck"
-                    path = self._save_stuck_screenshot()
-                    self._trigger_stuck_analysis("回合超时卡死", path)
+                self._round_deadline = time.monotonic() + self._round_timeout_seconds
+                try:
+                    self._refresh_journey_target()
+                    if self._recovering:
+                        self._recover_current_screen()
+                    self._runtime_poll()
+                    self.round_count += 1
+                    self._handler_ctx.round_count = self.round_count
+                    self.logger.start_turn_timing()
+                    self._write_checkpoint("before_round")
+                    success = self._do_round()
+                    self.logger.end_turn_timing()
+                    self.logger.end_turn()
+                    self._write_checkpoint("after_round", success=bool(success))
+                    self.logger.save("running", announce=False)
+                    self._runtime_status("running")
+                    if self._step_once:
+                        self._step_once = False
+                        self._paused = True
+                        self._safe_paused = False
+                        self._paused_at = time.monotonic()
+                        self._safe_pause_reason = "step_complete"
+                        self._runtime_status("paused_manual", "step_complete")
+                    else:
+                        self.controller.wait(0.1 if success else self._handlers.adaptive_wait)
+                except JourneyEndException:
+                    self._exit_reason = "journey_end"
+                    self._event("journey_end")
                     break
-
-                success = self._do_round()
-                turn_elapsed = self.logger.end_turn_timing()
-                print(f"[计时] 本轮耗时 {turn_elapsed:.1f}s")
-
-                # 检查 _do_round 里设置的卡死标记
-                if self._exit_reason == "stuck":
-                    break
-
-                if not success:
-                    wait_time = self._handlers.adaptive_wait
-                    print(f"[等待] 未命中 ({wait_time:.1f}s)...")
-                    time.sleep(wait_time)
-
-                if self.max_rounds == 0 or self.round_count < self.max_rounds:
-                    time.sleep(0.1)
-
-        except JourneyEndException:
-            print("\n[信息] 旅程结束, 脚本正常退出")
-            self._exit_reason = "journey_end"
-        except EventDecisionPending as error:
-            print(f'\n[暂停] {error}')
-            self._exit_reason = 'event_reference_pending'
+                except RuntimeInterrupt as error:
+                    self._close_interrupted_turn()
+                    if self._stop_requested:
+                        break
+                    if not self._paused:
+                        self._enter_safe_pause(error.reason)
+                except (EventDecisionPending, InputTargetError, SafePauseError, JourneyTargetPending) as error:
+                    self._close_interrupted_turn()
+                    self._enter_safe_pause(type(error).__name__, error=str(error))
+                except Exception as error:
+                    self._close_interrupted_turn()
+                    self._enter_safe_pause("runtime_exception", error=f"{type(error).__name__}: {error}")
+                finally:
+                    self._round_deadline = 0
         except KeyboardInterrupt:
-            print("\n[信息] 用户中断")
             self._exit_reason = "keyboard_interrupt"
+            self._stop_requested = True
         finally:
-            self._save_log()
-            print(f"\n[完成] 共执行 {self.round_count} 轮")
+            self._runtime_active = False
+            try:
+                self._save_log()
+                final = "journey_end" if self._exit_reason == "journey_end" else "stopped"
+                self._write_checkpoint(final, reason=self._exit_reason)
+                self._runtime_status(final, self._exit_reason)
+            finally:
+                self.runtime.release()
+            print(f"[完成] 本次执行 {self.round_count} 轮；原因={self._exit_reason}")
+
+    def _on_runtime_frame(self, screenshot):
+        if self._paused:
+            return
+        self._last_runtime_frame = screenshot
+        self._last_frame_fingerprint = self._fingerprint_frame(screenshot)
+
+    def _close_interrupted_turn(self):
+        if self.logger._current_turn is not None:
+            self.logger.end_turn_timing()
+            self.logger.end_turn()
 
     def _do_round(self) -> bool:
-        """单轮: 截屏 → 处理器链调度"""
-        # 快速路径: handler 已缓存转场后的截图, 直接复用省去 capture_game + dispatch 周期
-        if self._handler_ctx.pending_screenshot is not None:
-            screenshot = self._handler_ctx.pending_screenshot
-            self._handler_ctx.pending_screenshot = None
-        else:
+        """Recognize the current page on every dispatch; old handler stacks are never resumed."""
+        self._runtime_poll()
+        self._refresh_journey_target()
+        screenshot = self._handler_ctx.pending_screenshot
+        self._handler_ctx.pending_screenshot = None
+        if screenshot is None:
             screenshot = self.capture.capture_game()
         if screenshot is None:
-            print("[错误] 截屏失败")
-            return False
-
-        # Keep the frame that caused this handler decision.  RunLogger stores
-        # it next to the action record so the UI can reopen the exact screen.
-        if self.logger is not None:
-            self.logger.set_screenshot(screenshot)
-
+            raise SafePauseError("截屏失败")
+        self.logger.set_screenshot(screenshot)
+        self._on_runtime_frame(screenshot)
+        self._write_checkpoint("frame_captured", screenshot=screenshot)
+        self._event("frame_captured", fingerprint=self._last_frame_fingerprint)
         frame = FrameContext(screenshot)
-
         for handler in self._handlers.handlers:
+            self._runtime_poll()
+            if not handler.can_handle(frame, self.ui.ocr):
+                continue
+            self._active_handler_name = handler.name
             try:
-                if handler.can_handle(frame, self.ui.ocr):
-                    self._handlers._consecutive_misses = 0
-
-                    if isinstance(handler, TrainingHandler):
-                        self._consecutive_unknown = 0
-                        self._last_handler_name = ""
-                        self._same_handler_count = 0
-                        return self._handle_training_screen(screenshot)
-                    else:
-                        t0 = time.perf_counter()
-                        handler.handle(self._handler_ctx)
-                        if isinstance(handler, AppraisalHandler):
-                            # 新的评鉴战阶段开始后，下一阶段商店可重新处理。
-                            for shop_handler in self._handlers.handlers:
-                                if hasattr(shop_handler, '_trade_handled'):
-                                    shop_handler._trade_handled = False
-                        elapsed = (time.perf_counter() - t0) * 1000
-                        self.logger.log_handler_dispatch(handler.name, elapsed)
-
-                        # 快速跳转: handler 已确认目标界面, 直接处理省去 dispatch 周期
-                        if self._handler_ctx.pending_action == "training":
-                            self._handler_ctx.pending_action = ""
-                            self._consecutive_unknown = 0
-                            self._last_handler_name = ""
-                            self._same_handler_count = 0
-                            ss = self._handler_ctx.pending_screenshot
-                            self._handler_ctx.pending_screenshot = None
-                            if ss is not None:
-                                return self._handle_training_screen(ss)
-
-                        # 卡死检测1: 连续 UnknownHandler 匹配 → 卡死
-                        if isinstance(handler, UnknownHandler):
-                            self._consecutive_unknown += 1
-                            if (self._consecutive_unknown >= self._stuck_threshold
-                                    and not self._development_mode):
-                                print(f"\n[保护] 连续{self._consecutive_unknown}轮Unknown → 卡死!")
-                                self._exit_reason = "stuck"
-                                path = self._save_stuck_screenshot()
-                                self._trigger_stuck_analysis("连续UnknownHandler卡死", path)
-                                return False
-                        else:
-                            self._consecutive_unknown = 0
-                            self._handler_ctx.consecutive_unknown = 0
-                            # 卡死检测2: 同handler连续触发 (非Unknown/Skip/战后)
-                            if handler.name == self._last_handler_name:
-                                self._same_handler_count += 1
-                                if self._same_handler_count >= self._stuck_threshold:
-                                    print(f"\n[保护] 连续{self._same_handler_count}次 {handler.name} → 卡死!")
-                                    self._exit_reason = "stuck"
-                                    path = self._save_stuck_screenshot()
-                                    self._trigger_stuck_analysis(f"连续{handler.name}卡死", path)
-                                    return False
-                            else:
-                                self._last_handler_name = handler.name
-                                self._same_handler_count = 1
-                        return True
-            except (JourneyEndException, InputTargetError, EventDecisionPending):
-                raise
-            except Exception as e:
-                print(f"[{handler.name}] 异常: {e}")
-
+                record_items = frame.recognize_full(self.ui.ocr)
+                record_error = None
+            except Exception as error:
+                record_items, record_error = [], str(error)
+            self.logger.observe_frame(record_items, handler.name, self.round_count, error=record_error)
+            self._event("handler_matched", handler=handler.name)
+            self._handlers._consecutive_misses = 0
+            if isinstance(handler, UnknownHandler):
+                self._consecutive_unknown += 1
+                if self._consecutive_unknown >= self._stuck_threshold and not self._development_mode:
+                    raise SafePauseError("连续未知界面，等待诊断")
+            else:
+                self._consecutive_unknown = 0
+                self._handler_ctx.consecutive_unknown = 0
+                unchanged = self._frame_difference(screenshot, self._stagnant_frame) < 2
+                if self._last_handler_name == handler.name and unchanged:
+                    self._same_handler_count += 1
+                else:
+                    self._same_handler_count = 1
+                    self._stagnant_frame = screenshot.copy()
+                self._last_handler_name = handler.name
+                if self._same_handler_count >= self._stuck_threshold:
+                    raise SafePauseError(f"{handler.name} 连续执行后画面未变化")
+            start = time.perf_counter()
+            if isinstance(handler, TrainingHandler):
+                result = self._handle_training_screen(screenshot)
+            else:
+                result = handler.handle(self._handler_ctx)
+                if isinstance(handler, AppraisalHandler):
+                    for shop in self._handlers.handlers:
+                        if hasattr(shop, '_trade_handled'):
+                            shop._trade_handled = False
+            self.logger.log_handler_dispatch(handler.name, (time.perf_counter() - start) * 1000)
+            self._event("handler_completed", handler=handler.name, success=bool(result))
+            # Fast-path hints are advisory only. Re-dispatch the captured page next round.
+            self._handler_ctx.pending_action = ""
+            return bool(result)
         self._handlers._consecutive_misses += 1
+        self.logger.observe_frame([], "未匹配界面", self.round_count, error="没有匹配的页面处理器")
         return False
 
     # ===================== 训练界面处理 =====================
@@ -596,106 +527,6 @@ class Trainer:
             return turn
         print("[回合] 当前画面未显示 X/45，使用普通训练规则")
         return None
-
-    def _save_stuck_screenshot(self):
-        """卡死时自动保存现场截图供 AI 分析"""
-        try:
-            import cv2
-            from datetime import datetime
-            screenshot = self.capture.capture_game()
-            if screenshot is not None:
-                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-                path = f"templates/_stuck_{ts}.png"
-                cv2.imwrite(path, screenshot)
-                print(f"[保护] 卡死截图已保存: {path}")
-                self.logger.stuck_screenshot = path
-                return path
-        except Exception as e:
-            print(f"[保护] 截图保存失败: {e}")
-        return None
-
-    def _trigger_stuck_analysis(self, reason: str, screenshot_path: str = None):
-        """卡死时写入分析上下文 + 创建 trigger.txt 触发 AI 分析流水线"""
-        try:
-            import json
-            from datetime import datetime
-            ai_dir = Path("ai_suggestions")
-            ai_dir.mkdir(exist_ok=True)
-
-            # 保存日志
-            log_path = self.logger.save(reason)
-
-            # 收集最近回合摘要
-            turns_summary = []
-            for turn in self.logger._turns[-5:]:
-                actions_summary = []
-                for a in turn.get("actions", []):
-                    t = a.get("type", "?")
-                    if t == "decision":
-                        actions_summary.append(f"decision: {a.get('action', '?')} (rule={a.get('matched_rule', 'N/A')})")
-                    elif t == "rest":
-                        actions_summary.append(f"rest: {a.get('option', '?')} cost={a.get('cost', 0)}")
-                    elif t == "train":
-                        actions_summary.append(f"train: {a.get('attribute', '?')}")
-                    elif t == "event":
-                        actions_summary.append(f"event: {a.get('event_name', '?')} opt={a.get('option_selected', 0)}")
-                    elif t == "shop":
-                        actions_summary.append(f"shop: bought={a.get('bought', [])}")
-                    elif t == "handler":
-                        actions_summary.append(f"handler: {a.get('name', '?')}")
-                    else:
-                        actions_summary.append(t)
-                turns_summary.append({
-                    "round": turn["round"],
-                    "turn": turn.get("turn"),
-                    "stamina": turn.get("state_before", {}).get("stamina"),
-                    "mood": turn.get("state_before", {}).get("mood"),
-                    "actions": actions_summary,
-                })
-
-            profile = self.engine.rule_profile_name if self.engine.is_rule_engine_mode else "traditional"
-            bd = "N/A"
-            if self.engine.is_rule_engine_mode:
-                try:
-                    bd = self.engine.rule_profile.legacy_strategy.build_direction.value
-                except Exception:
-                    pass
-
-            context = {
-                "stuck_reason": reason,
-                "screenshot": screenshot_path,
-                "log_file": str(log_path),
-                "round_count": self.round_count,
-                "consecutive_unknown": self._consecutive_unknown,
-                "profile": profile,
-                "build_direction": bd,
-                "recent_turns": turns_summary,
-            }
-
-            # 写入 latest.md
-            latest = ai_dir / "latest.md"
-            ts = datetime.now().strftime("%m-%d %H:%M")
-            md = f"# 卡死分析 ({ts})\n\n"
-            md += f"**原因**: {reason}\n\n"
-            md += f"**截图**: {screenshot_path or 'N/A'}\n\n"
-            md += f"**日志**: {log_path}\n\n"
-            md += f"**轮次**: 第{self.round_count}轮, **连续Unknown**: {self._consecutive_unknown}轮\n\n"
-            md += f"**配置**: {profile} / {bd}\n\n"
-            branch_text = self._handler_ctx.last_branch_text
-            if branch_text:
-                md += f"**最后分支文字**: `{branch_text}`\n\n"
-            md += f"## 最近回合\n\n"
-            md += "```json\n" + json.dumps(turns_summary, ensure_ascii=False, indent=2) + "\n```\n"
-            latest.write_text(md, encoding="utf-8")
-
-            # 创建 trigger.txt
-            trigger = ai_dir / "trigger.txt"
-            trigger.write_text(f"stuck|{reason}|{screenshot_path or 'N/A'}|{log_path}", encoding="utf-8")
-
-            print(f"[流水线] 分析上下文已写入: {latest}")
-            print(f"[流水线] 触发器已创建: {trigger}")
-        except Exception as e:
-            print(f"[流水线] 写入失败: {e}")
 
     def _increment_turn(self):
         """训练或休息完成后递增回合计数"""
@@ -1630,7 +1461,12 @@ class Trainer:
             print(f"  最大轮次: {self.max_rounds if self.max_rounds > 0 else '无限'}")
 
     def _save_log(self):
-        self.logger.save(exit_reason=self._exit_reason)
+        try:
+            self.logger.save(exit_reason=self._exit_reason)
+        except (OSError, ValueError) as error:
+            self._diagnostics["recording_error"] = str(error)
+            self._event("recording_error", error=str(error))
+            print(f"[日志] 保存失败，保留已有记录: {error}")
 
     def calibrate(self):
         """校准模式: 截图 + 全屏 OCR 输出"""

@@ -27,7 +27,7 @@
         <span class="status-dot" id="healthDot"></span>
         <div>
           <strong>本地模式</strong>
-          <small>只读游戏画面，不发送输入</small>
+          <small>脚本负责输入，AI仅在安全暂停时接管</small>
         </div>
       </div>
     </aside>
@@ -41,8 +41,6 @@
         </div>
         <div class="top-actions">
           <span class="updated-label" id="updatedLabel">尚未刷新</span>
-          <span class="runtime-pill run-only" id="runtimeStatus" data-run-only>未运行</span>
-          <button class="button primary run-control run-only" id="runControlBtn" data-run-only>▶ 启动自动化</button>
           <button class="button secondary" id="refreshBtn">↻ 刷新数据</button>
         </div>
       </header>
@@ -50,6 +48,69 @@
       <div class="toast" id="toast" role="status"></div>
 
       <section class="tab-page active" id="tab-run">
+        <article class="panel runtime-panel">
+          <div class="runtime-summary"><span class="runtime-pill" id="runtimeStatus">未运行</span><p id="runtimeReason">自动运行与恢复由脚本完成</p></div>
+          <div class="runtime-controls">
+            <button class="button primary run-control" id="runControlBtn">▶ 启动自动化</button>
+            <button class="button secondary" id="pauseRuntimeBtn" hidden>Ⅱ 暂停</button>
+            <button class="button secondary" id="resumeRuntimeBtn" hidden>▶ 继续</button>
+            <button class="button secondary" id="stepRuntimeBtn" hidden title="执行一个页面处理流程后再次暂停">↦ 单步处理</button>
+            <button class="button secondary" id="restartRuntimeBtn" hidden>↻ 重启恢复</button>
+            <button class="button secondary" id="inspectRuntimeBtn" hidden>▧ 查看现场</button>
+          </div>
+        </article>
+        <details class="panel target-panel" id="journeyTargetPanel" open>
+          <summary><span><strong>旅程目标预检查</strong><small id="targetSummary">先填写角色和目标技能，再启动</small></span><span class="image-badge" id="targetBadge">未保存</span></summary>
+          <div class="target-body">
+            <div class="target-form-grid">
+              <label>目标角色<input id="targetCharacter" list="targetCharacterList" placeholder="选择推荐角色或手动输入" maxlength="80"><datalist id="targetCharacterList"></datalist></label>
+              <label>玩法<select id="targetPlaystyle"><option value="pve">PVE（主线）</option><option value="pvp">PVP（圣凯）</option><option value="cosmos">宇宙门</option></select></label>
+              <label class="target-combo-field">目标装备技能组合<select id="targetCombo"><option value="">请选择目标组合</option></select></label>
+              <label>训练 / 普通事件方向<select id="targetTrainingDirection"><option value="">请选择</option><option value="attack">攻击（优先力量）</option><option value="survival">生存（优先体力）</option></select></label>
+            </div>
+            <div class="target-recommendations" id="targetRecommendations">输入角色后查看表格推荐，也可指定自定义目标。</div>
+            <div class="target-effect" id="targetEffect" hidden></div>
+            <div class="target-checks">
+              <label><input type="checkbox" id="targetHasPartner">目标所需的后续材料 / 特殊装备已经获得</label>
+            </div>
+            <details class="setup-details"><summary>实际携带配置（选填，用于后续复盘）</summary>
+              <p>填写本轮实际选择的资料。留空表示尚未记录，确认没有携带时填“无”。</p>
+              <div class="target-form-grid">
+                <label>实际角色<input id="setupCharacter" maxlength="80" placeholder="与目标角色分开记录"></label>
+                <label>实际旅程记录<textarea id="setupJourneyRecords" rows="3" placeholder="每行一个名称"></textarea></label>
+                <label>实际支援卡<textarea id="setupSupportCards" rows="3" placeholder="每行一个名称"></textarea></label>
+              </div>
+            </details>
+            <div class="target-footer"><p id="targetCoverage"></p><div><button class="button secondary" id="precheckTargetBtn">预检查</button><button class="button primary" id="saveTargetBtn">保存本轮目标</button></div></div>
+            <div class="target-result" id="targetResult" role="status">选择目标技能后，脚本自动规划所需装备和三月声援方向。</div>
+            <p class="target-source"><a href="https://docs.qq.com/sheet/DZkh2QmxKdnJUaVpw?tab=6chp1a" target="_blank" rel="noopener">角色推荐表 ↗</a><a href="https://docs.qq.com/sheet/DZkh2QmxKdnJUaVpw?tab=lzqghu" target="_blank" rel="noopener">装备技能表 ↗</a><span>装备仅有图片、结果不明或材料已齐但需处置时，脚本会暂停等待核对。</span></p>
+          </div>
+        </details>
+        <details class="panel target-panel" id="journeyRecordsPanel">
+          <summary><span><strong>旅程复盘记录</strong><small id="journeyRecordSummary">查看携带配置与结算结果</small></span></summary>
+          <div class="target-body">
+            <div class="target-form-grid"><label>旅程<select id="journeyRecordSelect"><option value="">暂无记录</option></select></label></div>
+            <div class="target-result" id="journeyRecordInfo">脚本下次运行后会开始采集。重启恢复后的同一旅程会关联到一起。</div>
+            <p class="target-source"><a id="journeyEndScreenshot" target="_blank" rel="noopener" hidden>查看结束画面 ↗</a></p>
+            <details class="setup-details"><summary>查看结束画面的识别文字</summary><pre id="journeyEndOcr">尚未记录</pre></details>
+            <div class="target-form-grid" id="journeyResultFields">
+              <label>实际角色<input id="resultCharacter" maxlength="80" placeholder="未核对"></label>
+              <label>实际旅程记录<textarea id="resultJourneyRecords" rows="3" placeholder="每行一个名称；确认没有填“无”"></textarea></label>
+              <label>实际支援卡<textarea id="resultSupportCards" rows="3" placeholder="每行一个名称；确认没有填“无”"></textarea></label>
+              <label>最终力量<input data-final-stat="力量" type="number" min="0" max="99999" placeholder="未核对"></label>
+              <label>最终体力<input data-final-stat="体力" type="number" min="0" max="99999" placeholder="未核对"></label>
+              <label>最终韧性<input data-final-stat="韧性" type="number" min="0" max="99999" placeholder="未核对"></label>
+              <label>最终专注<input data-final-stat="专注" type="number" min="0" max="99999" placeholder="未核对"></label>
+              <label>最终保护<input data-final-stat="保护" type="number" min="0" max="99999" placeholder="未核对"></label>
+              <label>最终综合等级<input id="resultRank" type="number" min="0" max="99999" placeholder="未核对"></label>
+              <label>最终潜质点数<input id="resultPotential" type="number" min="0" max="99999" placeholder="未核对"></label>
+              <label>最终评鉴结果<select id="resultAppraisal"><option value="">未核对</option><option value="victory">胜利</option><option value="defeat">失败</option></select></label>
+              <label>最终已装备技能<textarea id="resultSkills" rows="3" placeholder="每行组合代码，如 AX5；确认没有填“无”"></textarea></label>
+            </div>
+            <div class="target-footer"><p>可先在游戏中打开左侧放大镜的“旅程信息”页，再回到这里读取；若仍停在结算页，扫描器只会在游戏前台时自动点击一次放大镜。扫描会保留截图与识别原文，只填写能确认的字段；支援卡名称不可读时继续留给人工。</p><div><button class="button secondary" id="refreshJourneyRecordsBtn">刷新记录</button><button class="button secondary" id="scanJourneyInfoBtn" disabled>读取当前旅程信息</button><button class="button primary" id="saveJourneyResultBtn" disabled>保存核对结果</button></div></div>
+            <div class="target-result" id="journeyResultMessage" role="status">旅程结束后再核对最终结果。</div>
+          </div>
+        </details>
         <div class="metric-grid">
           <article class="metric-card accent-purple">
             <span class="metric-label">最近运行</span>

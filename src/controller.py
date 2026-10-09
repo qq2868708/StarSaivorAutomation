@@ -2,7 +2,7 @@
 输入控制器 - SendInput 硬件级鼠标模拟
 
 使用 Win32 SendInput API 注入鼠标事件到系统输入队列。
-所有游戏 (包括 Unity/DirectX) 都能正常响应。
+游戏是否接受输入取决于前台窗口、权限及游戏自身的输入实现。
 点击前保存光标位置，点击后恢复，尽量减少对用户操作的影响。
 
 移植自 SleepRunner MouseSimulator.cs + GameContext.cs
@@ -12,7 +12,7 @@ import ctypes
 import ctypes.wintypes
 import random
 
-from .capture import user32, gdi32
+from .capture import user32, gdi32, is_window_foreground
 
 kernel32 = ctypes.windll.kernel32
 
@@ -88,6 +88,9 @@ class Controller:
         self._game_region = None
         self._dpi_scale = None
         self._rng = random.Random()
+        self.before_action = None
+        self.after_action = None
+        self.poll_control = None
 
     def set_game_region(self, region):
         self._game_region = region
@@ -115,7 +118,7 @@ class Controller:
         user32.SetForegroundWindow(self._hwnd)
         # Windows 前台锁定会让终端/调试器保留前台资格；临时连接当前
         # 线程、目标窗口线程与前台线程后再重试，保证脚本重启时能回到游戏窗口。
-        if user32.GetForegroundWindow() != self._hwnd:
+        if not is_window_foreground(self._hwnd):
             foreground = user32.GetForegroundWindow()
             foreground_thread = user32.GetWindowThreadProcessId(foreground, None) if foreground else 0
             target_thread = user32.GetWindowThreadProcessId(self._hwnd, None)
@@ -134,7 +137,7 @@ class Controller:
                 for source, target in reversed(attached_pairs):
                     user32.AttachThreadInput(source, target, False)
         time.sleep(0.15)
-        if user32.GetForegroundWindow() != self._hwnd:
+        if not is_window_foreground(self._hwnd):
             raise InputTargetError("请把 StarSavior 切到前台后再启动")
 
     def _check_input_target(self):
@@ -143,29 +146,31 @@ class Controller:
         if user32.GetForegroundWindow() != self._hwnd:
             if self.auto_refocus:
                 self.focus_game_window()
-            if user32.GetForegroundWindow() == self._hwnd:
+            if is_window_foreground(self._hwnd):
                 return
             raise InputTargetError("游戏不在前台，停止发送输入；请切回游戏")
 
     # ===================== 核心点击 (SendInput) =====================
 
-    def click_at_percent(self, x_pct, y_pct, fast=False):
+    def click_at_percent(self, x_pct, y_pct, fast=False, source="script"):
         """
         在游戏窗口的百分比坐标处点击。
 
-        使用 SendInput (硬件级输入), 所有游戏都响应。
+        使用 SendInput 向系统输入队列发送事件。
         点击前保存光标位置, 点击后恢复。
         fast=True 时跳过随机延迟, 用于快速推进。
         """
-        if self._hwnd is None:
-            self._fallback_click(x_pct, y_pct)
-            return
         self._check_input_target()
+        action = {"kind": "click", "x": float(x_pct), "y": float(y_pct), "source": source}
+        if self.before_action:
+            self.before_action(action)
 
         # 1. 保存当前光标位置
         saved_pos = POINT()
         user32.GetCursorPos(ctypes.byref(saved_pos))
 
+        pressed = False
+        error = None
         try:
             # 2. 客户区百分比 → 屏幕绝对坐标
             screen_x, screen_y = self._percent_to_screen(x_pct, y_pct)
@@ -177,16 +182,27 @@ class Controller:
 
             # 4. 点击
             self._send_mouse_event(MOUSEEVENTF_LEFTDOWN)
+            pressed = True
             if fast:
                 time.sleep(0.01)
             else:
                 time.sleep(self._rng.uniform(0.06, 0.14))
             self._send_mouse_event(MOUSEEVENTF_LEFTUP)
+            pressed = False
             time.sleep(0.01 if fast else self.click_delay)
+        except BaseException as exc:
+            error = exc
+            raise
         finally:
+            cleanup = []
+            if pressed:
+                cleanup.append(lambda: self._send_mouse_event(MOUSEEVENTF_LEFTUP))
             # 每次点击都立即恢复，避免连续未知状态把真实鼠标留在游戏上。
-            self._send_move(saved_pos.x, saved_pos.y)
+            cleanup.append(lambda: self._send_mouse_input(
+                saved_pos.x, saved_pos.y, MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
+                check_target=False))
             self._saved_cursor = (saved_pos.x, saved_pos.y)
+            self._complete_input(action, error, cleanup)
 
     def restore_cursor(self):
         """恢复到操作前的光标位置"""
@@ -212,17 +228,11 @@ class Controller:
 
     def send_escape(self):
         """发送 ESC 键 (SendInput 键盘事件)"""
-        self._send_key(VK_ESCAPE, key_up=False)
-        time.sleep(0.05)
-        self._send_key(VK_ESCAPE, key_up=True)
-        time.sleep(0.1)
+        self._press_key(VK_ESCAPE, "escape")
 
     def send_space(self):
         """发送空格键 (用于跳过战斗兜底)"""
-        self._send_key(VK_SPACE, key_up=False)
-        time.sleep(0.05)
-        self._send_key(VK_SPACE, key_up=True)
-        time.sleep(0.1)
+        self._press_key(VK_SPACE, "space")
 
     def send_number_key(self, n: int):
         """发送数字键 1-4 (用于事件选项热键选择)"""
@@ -230,10 +240,40 @@ class Controller:
         vk = vk_map.get(n)
         if vk is None:
             return
-        self._send_key(vk, key_up=False)
-        time.sleep(0.05)
-        self._send_key(vk, key_up=True)
-        time.sleep(0.1)
+        self._press_key(vk, str(n))
+
+    def _press_key(self, vk, label):
+        self._check_input_target()
+        action = {"kind": "key", "key": label, "source": "script"}
+        if self.before_action:
+            self.before_action(action)
+        pressed = False
+        error = None
+        try:
+            self._send_key(vk, key_up=False)
+            pressed = True
+            time.sleep(0.05)
+        except BaseException as exc:
+            error = exc
+            raise
+        finally:
+            cleanup = [lambda: self._send_key(vk, key_up=True)] if pressed else []
+            self._complete_input(action, error, cleanup)
+        self.wait(0.1)
+
+    def _complete_input(self, action, error, cleanup):
+        """Try every release/restoration step, then persist even if cleanup failed."""
+        cleanup_error = None
+        for operation in cleanup:
+            try:
+                operation()
+            except BaseException as exc:
+                if cleanup_error is None:
+                    cleanup_error = exc
+        if self.after_action:
+            self.after_action(action, error if error is not None else cleanup_error)
+        if cleanup_error is not None and error is None:
+            raise cleanup_error
 
     # ===================== 内部实现 =====================
 
@@ -271,7 +311,7 @@ class Controller:
         """发送鼠标事件 (在当前光标位置)"""
         self._send_mouse_input(0, 0, flags)
 
-    def _send_mouse_input(self, dx, dy, flags):
+    def _send_mouse_input(self, dx, dy, flags, check_target=True):
         """SendInput 底层调用 (鼠标)"""
         screen_w = user32.GetSystemMetrics(SM_CXSCREEN)
         screen_h = user32.GetSystemMetrics(SM_CYSCREEN)
@@ -290,7 +330,7 @@ class Controller:
         inp.union.mi.time = 0
         inp.union.mi.dwExtraInfo = 0
 
-        if not flags & MOUSEEVENTF_LEFTUP:
+        if check_target and not flags & MOUSEEVENTF_LEFTUP:
             self._check_input_target()
         if user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(INPUT)) != 1:
             raise InputTargetError("鼠标输入失败，请核对游戏与脚本的运行权限")
@@ -325,4 +365,11 @@ class Controller:
     def wait(self, seconds=None):
         if seconds is None:
             seconds = self.action_interval
-        time.sleep(seconds)
+        deadline = time.monotonic() + max(0, seconds)
+        while True:
+            if self.poll_control:
+                self.poll_control()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            time.sleep(min(0.1, remaining))

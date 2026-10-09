@@ -27,6 +27,7 @@ import cv2
 import numpy as np
 
 from .event_effects import choose_option, score_options
+from .journey_target import direction_choice, equipment_choice, JourneyTargetPending
 
 
 # ============================================================
@@ -336,6 +337,12 @@ class HandlerContext:
         self.pending_action = ""  # "training" 等
         self.pending_screenshot = None  # 已确认的截图, 避免重复 capture
         self.development_mode = False
+        self.journey_target = None
+        self.target_selection_phase = None
+        # Empirical event exploration is supplied by RuntimeSession.  It is
+        # intentionally callback based so handlers stay usable in offline tests.
+        self.exploration_prepare = None
+        self.exploration_finish = None
 
     def set_turn_detector(self, callback):
         self._turn_detector = callback
@@ -1433,13 +1440,15 @@ class EventHandler(Handler):
         if screenshot is None:
             return False
 
-        if self.config.get('events', {}).get('require_document_effects', False):
+        if self.config.get('events', {}).get('require_document_effects', False) or getattr(ctx, 'journey_target', None):
             return self._handle_document_event(ctx, screenshot)
 
         # OCR 选项文字和标记文字
         option_text = _ocr_region(ctx.ocr, screenshot, *self.OPTION_REGIONS[0])
         frame_ctx = FrameContext(screenshot)
         marker_text = self._read_marker(frame_ctx, ctx.ocr)
+        if '训练的方向性' in marker_text or '训练方向性' in marker_text:
+            return self._handle_document_event(ctx, screenshot)
         num_options = self._count_options(option_text)
 
         # 保存点击前归一化文本, 用于后续相似度验证
@@ -1573,6 +1582,16 @@ class EventHandler(Handler):
         detector = ScreenDetector(ctx.ocr)
         marker = detector.read_region_text(screenshot, 0.035, 0.14, 0.40, 0.16)
         rows = detector.read_event_option_rows(screenshot)
+        if '训练的方向性' in marker or '训练方向性' in marker:
+            index = direction_choice(getattr(ctx, 'journey_target', None), rows)
+            return self._execute_target_event(ctx, screenshot, marker, rows, index, detector)
+        if getattr(ctx, 'journey_target', None) and ('装备' in marker or '大魔女' in marker):
+            if ctx.journey_target.get('has_partner'):
+                raise JourneyTargetPending('目标装备材料已齐；此装备事件尚无多余装备处置规则')
+            enabled_rows = [(i, row) for i, row in enumerate(rows) if row.get('enabled')]
+            choice = equipment_choice(ctx.journey_target, [row['text'] for _, row in enabled_rows], True)
+            index = enabled_rows[choice['index']][0]
+            return self._execute_target_event(ctx, screenshot, marker, rows, index, detector, choice)
         normalize = lambda value: re.sub(r'[^\w\u4e00-\u9fff]', '', value)
         reference = self.config.get('events', {}).get('reference_document', '')
         quick_lookup_path = getattr(self, '_quick_lookup_path', Path('profiles/events/document_verified.json'))
@@ -1639,12 +1658,52 @@ class EventHandler(Handler):
                         ctx.logger.log_event(event_id=local_match['id'], event_name=local_match.get('event_name', '训练失败'),
                             option_selected=index, num_options=len(rows), auto_learned=False, matched=False)
                     return True
-            folder = Path('../verification/pending-event')
-            folder.mkdir(parents=True, exist_ok=True)
-            cv2.imwrite(str(folder / 'current.png'), screenshot)
-            (folder / 'current.json').write_text(json.dumps({'marker': marker, 'options': rows,
-                'reference_document': reference, 'input_sent': False}, ensure_ascii=False, indent=2), encoding='utf-8')
-            raise EventDecisionPending(f'事件「{marker}」尚未核对文档效果，已暂停，未选择选项。')
+            if not self.config.get('events', {}).get('exploration', True) or not getattr(ctx, 'exploration_prepare', None):
+                folder = Path('../verification/pending-event')
+                folder.mkdir(parents=True, exist_ok=True)
+                cv2.imwrite(str(folder / 'current.png'), screenshot)
+                (folder / 'current.json').write_text(json.dumps({'marker': marker, 'options': rows,
+                    'reference_document': reference, 'input_sent': False}, ensure_ascii=False, indent=2), encoding='utf-8')
+                raise EventDecisionPending(f'事件「{marker}」尚未核对文档效果，已暂停，未选择选项。')
+            selection = ctx.exploration_prepare(marker, rows, self._event_build_direction(ctx))
+            index = int(selection['index']) - 1
+            if index < 0 or index >= len(rows) or not rows[index].get('enabled'):
+                raise EventDecisionPending('探索模式无法定位可用事件选项，暂停等待核对。')
+            print(f"[事件探索] {marker} → 选项{index + 1}；{selection['reason']}")
+            ctx.controller.click_at_percent(0.80, rows[index]['y'])
+            deadline = time.perf_counter() + 6
+            before = [normalize(row['text']) for row in rows]
+            last_frame = screenshot
+            while time.perf_counter() < deadline:
+                ctx.controller.wait(0.4)
+                current = ctx.capture.capture_game()
+                if current is None:
+                    continue
+                last_frame = current
+                current_rows = detector.read_event_option_rows(current)
+                if [normalize(row['text']) for row in current_rows] != before:
+                    ctx.pending_screenshot = current
+                    if getattr(ctx, 'exploration_finish', None):
+                        ctx.exploration_finish(current)
+                    if ctx.logger:
+                        ctx.logger.log_event(selection['key'], marker, index + 1, len(rows), True, False,
+                                             target_decision={'exploration_mode': selection['mode'], 'reason': selection['reason']})
+                    return True
+            # OCR can legitimately keep returning the original option rows
+            # while the game has already applied a qualitative effect or is
+            # animating the next page.  Record the bounded observation and let
+            # the next dispatch re-read the live screen; do not strand a
+            # normal foreground run in a safe pause merely because no numeric
+            # receipt was recognized.
+            ctx.pending_screenshot = last_frame
+            if getattr(ctx, 'exploration_finish', None):
+                ctx.exploration_finish(last_frame)
+            if ctx.logger:
+                ctx.logger.log_event(selection['key'], marker, index + 1, len(rows), True, False,
+                                     target_decision={'exploration_mode': selection['mode'],
+                                                      'reason': selection['reason'],
+                                                      'observation': 'bounded_timeout'})
+            return True
         event = matches[0]
         selected_rows = matched_rows.get(event.get('id', id(event)), rows)
         direction = self._event_build_direction(ctx)
@@ -1705,9 +1764,49 @@ class EventHandler(Handler):
                 ctx.pending_screenshot = current
                 if ctx.logger:
                     ctx.logger.log_event(event_id=event['id'], event_name=event['event_name'],
-                        option_selected=index, num_options=len(selected_rows), auto_learned=False, matched=not local_rule)
+                        option_selected=index, num_options=len(selected_rows), auto_learned=False, matched=not local_rule,
+                        target_decision={"character": ctx.journey_target['character'],
+                            "combo_code": ctx.journey_target['combo_code'], "target_revision": ctx.journey_target['revision'],
+                            "training_direction": direction, "scores": scored} if getattr(ctx, 'journey_target', None) else None)
                 return True
         raise InputTargetError('事件选择后界面未变化，停止重复或改点其他选项。')
+
+    @staticmethod
+    def _execute_target_event(ctx, screenshot, marker, rows, index, detector, choice=None):
+        """Target combo strategy, with text validation and one-click acknowledgement."""
+        from .controller import InputTargetError
+        target = ctx.journey_target
+        evidence = {"target_revision": target['revision'], "character": target['character'],
+                    "combo_code": target['combo_code'], "training_direction": target['training_direction'],
+                    "event_direction": target['event_direction'], "source": 'user_preinput',
+                    "direction_source": target['direction_source'],
+                    "options": [row['text'] for row in rows]}
+        if ctx.logger:
+            ctx.logger.log_event('journey_target', marker, index + 1, len(rows), False, False,
+                                 target_decision=evidence)
+        if choice and ctx.target_selection_phase:
+            ctx.target_selection_phase('prepared', choice)
+        ctx.controller.click_at_percent(0.80, rows[index]['y'])
+        deadline = time.perf_counter() + 6
+        normalize = lambda text: re.sub(r'\s+', '', text)
+        before = [normalize(row['text']) for row in rows]
+        while time.perf_counter() < deadline:
+            ctx.controller.wait(0.4)
+            current = ctx.capture.capture_game()
+            if current is None:
+                continue
+            after = [normalize(row['text']) for row in detector.read_event_option_rows(current)]
+            current_marker = detector.read_region_text(current, 0.035, 0.14, 0.40, 0.16)
+            changed_page = bool(current_marker) and normalize(marker) not in normalize(current_marker)
+            if choice:
+                receipt = detector.read_region_text(current, 0.20, 0.10, 0.60, 0.75)
+                changed_page = bool(detector.is_main_menu_screen(current)) or ('获得' in receipt and choice['material'] in receipt)
+            if after != before and changed_page:
+                if choice and ctx.target_selection_phase:
+                    ctx.target_selection_phase('confirmed', choice)
+                ctx.pending_screenshot = current
+                return True
+        raise InputTargetError('目标选项点击后画面未变化，保持暂停，不重复选择')
 
     @staticmethod
     def _resolve_document_match(candidates: list[dict], marker: str,
@@ -1775,6 +1874,8 @@ class EventHandler(Handler):
     @staticmethod
     def _event_build_direction(ctx) -> str:
         """读取当前训练构筑方向，缺少引擎上下文时使用攻击向默认。"""
+        if getattr(ctx, 'journey_target', None):
+            return ctx.journey_target['training_direction']
         try:
             value = ctx.engine.rule_profile.legacy_strategy.build_direction.value
             return value if value in {'attack', 'survival'} else 'attack'
@@ -2300,6 +2401,16 @@ class CardSelectHandler(Handler):
         # 确定优先级列表
         priority_keywords = self._get_priority_keywords(build_direction)
 
+        target = getattr(ctx, 'journey_target', None)
+        if target:
+            build_direction = target['training_direction']
+            priority_keywords = self._get_priority_keywords(build_direction)
+            choice = equipment_choice(target, card_texts)
+            if choice:
+                if target.get('has_partner'):
+                    raise JourneyTargetPending('目标装备材料已齐；需要核对后续装备处置规则')
+                return self._execute_target_card(ctx, card_texts, choice)
+
         # 评分排序
         ranked = self._rank_cards(card_texts, priority_keywords)
 
@@ -2325,6 +2436,36 @@ class CardSelectHandler(Handler):
         time.sleep(0.3)
 
         return True
+
+    def _execute_target_card(self, ctx, texts, choice):
+        from .controller import InputTargetError
+        from .recognition import ScreenDetector
+        detector = ScreenDetector(ctx.ocr)
+        slot = choice['index']
+        if ctx.logger:
+            ctx.logger.log_card_select(slot, f"目标 {choice['combo_code']} 需要 {choice['material']}；"
+                                       f"角色={ctx.journey_target['character']}；目标版本={ctx.journey_target['revision']}", texts)
+        if ctx.target_selection_phase:
+            ctx.target_selection_phase('prepared', choice)
+        ctx.controller.click_at_percent(*self.CARD_CLICK_POINTS[slot])
+        ctx.controller.wait(0.3)
+        ctx.controller.click_at_percent(self.SELECT_DONE_X, self.SELECT_DONE_Y)
+        deadline = time.perf_counter() + 6
+        while time.perf_counter() < deadline:
+            ctx.controller.wait(0.4)
+            current = ctx.capture.capture_game()
+            if current is None:
+                continue
+            after = [_ocr_region(ctx.ocr, current, *region) for region in self.CARD_TEXT_REGIONS]
+            title = _ocr_region(ctx.ocr, current, *self.TITLE_REGION)
+            receipt = detector.read_region_text(current, 0.20, 0.10, 0.60, 0.75)
+            acknowledged = bool(detector.is_main_menu_screen(current)) or ('获得' in receipt and choice['material'] in receipt)
+            if after != texts and not self._is_card_select_title(title) and acknowledged:
+                if ctx.target_selection_phase:
+                    ctx.target_selection_phase('confirmed', choice)
+                ctx.pending_screenshot = current
+                return True
+        raise InputTargetError('目标装备选择后界面未变化，请核对已有装备，不重复输入')
 
     def _get_priority_keywords(self, build_direction: str) -> list:
         """根据构建方向获取优先级关键词列表"""
@@ -4372,6 +4513,16 @@ class JourneyEndHandler(Handler):
 
         # 已到最终“旅程结束”结算页时交还给人工接管。结算页后续的
         # 潜质/奖励操作不属于旅程推进，不能反复点击或进入商店处理。
+        logger = getattr(ctx, 'logger', None)
+        if logger and screenshot is not None:
+            try:
+                result_items = ctx.ocr.recognize_detailed(screenshot)
+                result_error = None
+            except Exception as error:
+                result_items, result_error = [], str(error)
+            logger.set_screenshot(screenshot)
+            logger.observe_frame(result_items, '旅程结束', getattr(ctx, 'round_count', 0),
+                                 error=result_error, final=True)
         if self.config.get("journey_end", {}).get("pause_for_manual", True):
             print("[旅程结束] 已到最终结算页，暂停等待人工接管")
             raise JourneyEndException("旅程结束，等待人工接管")

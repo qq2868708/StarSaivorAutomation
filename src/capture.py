@@ -24,6 +24,7 @@ PW_CLIENTONLY = 0x01
 PW_RENDERFULLCONTENT = 0x02
 SM_CXSCREEN = 0
 SM_CYSCREEN = 1
+GA_ROOT = 2
 
 # 截图超时 (秒) — PrintWindow 在目标窗口无响应时会永久阻塞
 CAPTURE_TIMEOUT = 5.0
@@ -58,6 +59,8 @@ _user_signatures = {
     "GetCursorPos": ([ctypes.c_void_p], ctypes.wintypes.BOOL),
     "ClientToScreen": ([ctypes.wintypes.HWND, ctypes.c_void_p], ctypes.wintypes.BOOL),
     "GetForegroundWindow": ([], ctypes.wintypes.HWND),
+    "GetAncestor": ([ctypes.wintypes.HWND, ctypes.c_uint], ctypes.wintypes.HWND),
+    "GetWindowThreadProcessId": ([ctypes.wintypes.HWND, ctypes.c_void_p], ctypes.wintypes.DWORD),
     "SetForegroundWindow": ([ctypes.wintypes.HWND], ctypes.wintypes.BOOL),
     "SendInput": ([ctypes.c_uint, ctypes.c_void_p, ctypes.c_int], ctypes.c_uint),
 }
@@ -82,6 +85,41 @@ for _library, _signatures in ((user32, _user_signatures), (gdi32, _gdi_signature
 user32.SetProcessDPIAware()
 
 
+def is_window_foreground(hwnd):
+    """Return whether the foreground window belongs to the selected game window.
+
+    Unity and emulator-backed game windows can report a child/owned window as
+    foreground while the visible game remains active. Comparing only HWNDs
+    incorrectly pauses input in that case. Accept the same root window or a
+    foreground window from the same game process; never treat an unrelated
+    foreground application as the game.
+    """
+    if not hwnd or not user32.IsWindow(hwnd):
+        return False
+    foreground = user32.GetForegroundWindow()
+    if not foreground:
+        return False
+    if foreground == hwnd:
+        return True
+    try:
+        root = user32.GetAncestor(foreground, GA_ROOT)
+        target_root = user32.GetAncestor(hwnd, GA_ROOT)
+        if root and target_root and root == target_root:
+            return True
+
+        foreground_pid = ctypes.wintypes.DWORD()
+        target_pid = ctypes.wintypes.DWORD()
+        foreground_thread = user32.GetWindowThreadProcessId(
+            foreground, ctypes.byref(foreground_pid))
+        target_thread = user32.GetWindowThreadProcessId(
+            hwnd, ctypes.byref(target_pid))
+        if foreground_thread and target_thread:
+            return foreground_pid.value == target_pid.value
+    except (OSError, TypeError, ValueError):
+        return False
+    return False
+
+
 class ScreenCapture:
     """后台窗口截图 (移植自 SleepRunner BitBltCapture)"""
 
@@ -90,6 +128,8 @@ class ScreenCapture:
         self._hwnd = None
         self._dpi_scale = None
         self.last_capture_backend = None
+        self.before_capture = None
+        self.after_capture = None
 
     # ===================== 窗口查找 =====================
 
@@ -170,6 +210,8 @@ class ScreenCapture:
         所以放在子线程中执行并设置超时 (CAPTURE_TIMEOUT=5s)。
         超时后抛出 RuntimeError 让调用方处理。
         """
+        if self.before_capture:
+            self.before_capture()
         hwnd = self.get_hwnd()
         if hwnd is None:
             raise RuntimeError("无法找到游戏窗口")
@@ -307,7 +349,7 @@ class ScreenCapture:
         if float(result[0].std()) < 2:
             # Unity/DirectX can report PrintWindow success while returning black.
             # Capture only this game's client area when it is the foreground app.
-            if user32.GetForegroundWindow() != hwnd:
+            if not is_window_foreground(hwnd):
                 raise RuntimeError("后台截图为黑屏，请将 StarSavior 切到前台后重试")
             import mss
             rect = ctypes.wintypes.RECT()
@@ -322,11 +364,13 @@ class ScreenCapture:
                     "width": rect.right - rect.left,
                     "height": rect.bottom - rect.top,
                 }))
-            if user32.GetForegroundWindow() != hwnd:
+            if not is_window_foreground(hwnd):
                 raise RuntimeError("截图时游戏焦点改变，请切回游戏后重试")
             result[0] = cv2.cvtColor(pixels, cv2.COLOR_BGRA2BGR)
             self.last_capture_backend = "MSS foreground client area"
 
+        if self.after_capture:
+            self.after_capture(result[0])
         return result[0]
 
     def capture_region(self, x, y, w, h):

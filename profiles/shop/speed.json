@@ -544,15 +544,16 @@
     {
       "id": "shop_cf8683b8",
       "name": "鲜牛奶",
-      "type": "consumable",
+      "type": "mood_recovery",
       "keywords": [
         "鲜牛奶",
-        "鲜牛奶"
+        "鲜牛奶",
+        "新鲜牛奶 效果 状态2恢复"
       ],
-      "attr_name": "鲜牛奶",
-      "value": 0,
+      "attr_name": "效果状态",
+      "value": 2,
       "priority": null,
-      "note": "Wiki import 2026-05-26 17:01:55"
+      "note": "Upgraded 2026-10-09 02:07:18. Raw: 新鲜牛奶 效果 状态2恢复"
     },
     {
       "id": "shop_051aaaf2",
@@ -3339,6 +3340,24 @@
       "value": 20,
       "priority": 4,
       "note": "Auto-learned 2026-10-07 14:08:05. Raw: 效果 专注20增加 力量5增加"
+    },
+    {
+      "id": "shop_3392b4d6",
+      "name": "卡莱德绿茶",
+      "type": "potential_points",
+      "keywords": [
+        "卡莱德绿茶 效果 潜质点数20增加 保护10增加"
+      ],
+      "name_keys": [
+        "卡莱德绿茶"
+      ],
+      "effect_keys": [
+        "卡莱德绿茶 效果 潜质点数20增加 保护10增加"
+      ],
+      "attr_name": "潜质",
+      "value": 20,
+      "priority": 2,
+      "note": "Auto-learned 2026-10-09 02:07:17. Raw: 卡莱德绿茶 效果 潜质点数20增加 保护10增加"
     }
   ]
 }
