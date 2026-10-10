@@ -42,7 +42,7 @@ StarSavior 训练自动化是非官方桌面自动化工具，与《Star Savior�
 
 ## 技术栈
 
-- Python 3.11+
+- Python 3.11/3.12（本机已验证 3.12.14）
 - OpenCV（图像处理、模板匹配）
 - PaddleOCR（中文 OCR 识别）
 - NumPy（数值计算）
@@ -54,8 +54,10 @@ StarSavior 训练自动化是非官方桌面自动化工具，与《Star Savior�
 ```text
 .
 ├── main.py                  # 主入口
+├── launch_ui.py             # WebUI 启动器
 ├── ui_app.py                # 本地 WebUI 入口：截图、决策、日志、事件与权重编辑
 ├── web_ui.py                # FastAPI 本地服务
+├── tools/                   # 一次性校准与诊断工具
 ├── web/                     # WebUI 页面、样式和交互脚本
 ├── config.yaml              # 全局配置文件
 ├── src/
@@ -81,16 +83,26 @@ StarSavior 训练自动化是非官方桌面自动化工具，与《Star Savior�
 ## 环境要求
 
 - Windows 10/11 x64
-- Python 3.11+
+- Python 3.11/3.12（本机已验证 3.12.14）
 - 可交互桌面上的《Star Savior》游戏窗口
 
 ## 快速开始
 
 ### 1. 安装依赖
 
-```bash
-pip install -r requirements-runtime.txt
+双击 `启动面板.bat` 可自动建立虚拟环境、补齐锁定依赖并验证 OCR。
+已安装的依赖不会重复安装；日志保存在 `runtime/bootstrap.log`，失败时窗口保持打开。
+需要先安装 64 位 Python 3.11/3.12；启动器不会自动改动系统 Python 或删除旧环境。
+
+手动安装必须使用项目虚拟环境：
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-lock.txt
 ```
+
+仅检查环境：`.\启动面板.bat --check-only`。修复依赖：`.\启动面板.bat --repair --check-only`。
+正在运行的面板不会被原地更新依赖。完整版本记录、复现与验收范围见 [环境说明](docs/environment.md)。
 
 ### 2. 配置文件
 
@@ -111,7 +123,7 @@ journey_end:
 ### 3. 运行
 
 ```bash
-python main.py
+.\.venv\Scripts\python.exe main.py
 ```
 
 按 Enter 开始训练，Ctrl+C 中断。
@@ -122,7 +134,7 @@ Windows 下双击仓库根目录的 `启动面板.bat` 即可打开 WebUI。面�
 未运行时使用本地 `.venv` 启动并等待服务就绪。启动面板后，在页面中选择是否开始训练。
 
 ```bash
-python ui_app.py
+.\.venv\Scripts\python.exe ui_app.py
 ```
 
 检查台不会连接游戏窗口，也不会发送输入。它会在本机 `127.0.0.1:8765` 启动 WebUI，
@@ -139,6 +151,7 @@ python ui_app.py
 
 - `status.json`：`running`、`paused_manual`、`paused_safe`、`journey_end` 等状态
 - `checkpoint.json`：回合、当前界面指纹、最后动作和截图引用
+- `environment.json`：脱敏后的 Python、平台和运行依赖版本快照
 - `commands/` 和 `acks/`：本地命令队列和命令执行结果
 - `events.jsonl`：截图、识别、决策、点击、异常、暂停、恢复、旅程结束等事件
 - `screenshots/`：输入前和安全暂停时的游戏截图

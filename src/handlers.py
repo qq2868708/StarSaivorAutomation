@@ -1659,7 +1659,7 @@ class EventHandler(Handler):
                             option_selected=index, num_options=len(rows), auto_learned=False, matched=False)
                     return True
             if not self.config.get('events', {}).get('exploration', True) or not getattr(ctx, 'exploration_prepare', None):
-                folder = Path('../verification/pending-event')
+                folder = Path(__file__).resolve().parents[1] / "verification" / "pending-event"
                 folder.mkdir(parents=True, exist_ok=True)
                 cv2.imwrite(str(folder / 'current.png'), screenshot)
                 (folder / 'current.json').write_text(json.dumps({'marker': marker, 'options': rows,

@@ -16,7 +16,7 @@ from .rule_engine import TrainingRuleLoader
 
 
 def run_startup_check(trainer, require_game=False):
-    output = Path(__file__).resolve().parents[2] / "verification"
+    output = Path(__file__).resolve().parents[1] / "verification"
     output.mkdir(exist_ok=True)
     report = {
         "python": sys.version.split()[0],

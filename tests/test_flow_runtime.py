@@ -79,7 +79,7 @@ class FlowRuntimeTests(unittest.TestCase):
         ctx.controller.click_center_multi.assert_not_called()
 
     def test_attribute_gain_overlay_is_recognized(self):
-        frame_path = (Path(__file__).resolve().parents[2] /
+        frame_path = (Path(__file__).resolve().parents[1] /
                       "verification" / "attribute-gain-20261007" /
                       "attribute_gain_overlay.png")
         if not frame_path.is_file():

@@ -20,15 +20,16 @@ from typing import Any, Iterable
 import cv2
 
 from .capture import ScreenCapture, is_window_foreground
+from .quick_lookup_log import append_event
 from .controller import Controller
 from .recognition import HybridOCR
 from .runtime_control import RuntimeControl
 
 
 _CJK = re.compile(r"^[\u3400-\u9fff·]{2,24}$")
-_CJK_SHORT = re.compile(r"^[\u3400-\u9fff·]{2,10}$")
+_CJK_SHORT = re.compile(r"^[\u3400-\u9fff·]{1,10}$")
 _NAME = re.compile(r"^[A-Za-z0-9\u3400-\u9fff·]{2,14}$")
-_LEVEL = re.compile(r"^Lv\.?\s*(\d{1,3})(?:\s*/\s*(\d{1,3}))?", re.I)
+_LEVEL = re.compile(r"^Lv[.,，]?\s*(\d{1,3})(?:\s*/\s*(\d{1,3}))?", re.I)
 _NUMBER = re.compile(r"^[+-]?[\d,，]+(?:\.\d+)?%?$")
 _COUNT = re.compile(r"^(\d{1,4})\s*/\s*(\d{1,4})$")
 _PERCENT = re.compile(r"^[+-]?[\d,.]+%$")
@@ -47,7 +48,9 @@ _IDENTITY_UNCERTAIN = {"character", "character_full_name", "journey_initial_char
                        "card_name", "image", "roster_scan", "roster_details"}
 _SCAN_METADATA = {"complete", "attempted", "failed", "retries", "stop_reason",
                   "max_rescuers", "mode", "previous_count", "retained",
-                  "new_verified", "replaced", "total"}
+                  "new_verified", "replaced", "total", "succeeded",
+                  "inventory_complete", "success_rate", "accepted",
+                  "acceptance_threshold", "failed_characters"}
 
 _UI_TEXT = {
     "救援者", "救援者介绍", "潜质", "基本", "等级", "共鸣", "等级重置",
@@ -71,6 +74,10 @@ _STAT_LABELS = {
 
 class QuickLookupInterrupted(RuntimeError):
     """The user stopped a scan or its game input target became unavailable."""
+
+
+class QuickLookupEntryFailed(RuntimeError):
+    """A bounded entry attempt failed, but the list was safely recovered."""
 
 
 def _bounds(box):
@@ -351,10 +358,86 @@ def parse_rescuer(items) -> dict[str, Any]:
         if nearest_level:
             cx, cy = _center(row)
             roster.append({"name": row["text"], "evidence": [index],
-                           "center": [cx, cy], **nearest_level})
+                           "center": [cx, cy], **nearest_level,
+                           "name_evidence": [index],
+                           "level_evidence": nearest_level["evidence"],
+                           "confidence": row["confidence"]})
     result["roster"] = sorted(roster, key=lambda item: item["center"][1])
     result["ocr"] = [{key: row[key] for key in ("text", "confidence", "box")} for row in rows]
     return result
+
+
+def _physical_roster(page):
+    """Keep every fully visible level-anchored row, including unreadable names."""
+    named = {index: entry for entry in page.get("roster", [])
+             for index in entry.get("level_evidence", entry.get("evidence", []))}
+    result = []
+    for index, row in enumerate(_rows(page.get("ocr") or [])):
+        match = _LEVEL.match(row["text"])
+        if (not match or row["confidence"] < .5
+                or not 1180 <= row["bounds"][0] <= 1530
+                or not 145 <= row["bounds"][1] <= 750):
+            continue
+        entry = named.get(index, {})
+        result.append({"name": entry.get("name"), "level": int(match[1]),
+                       "confidence": entry.get("confidence", 0),
+                       "center": entry.get("center") or [1380, _center(row)[1] + 27]})
+    # A selected row can lose the level prefix to its highlight animation.
+    # Keep high-confidence name rows on the same 90px grid as their neighbours.
+    anchors = list(result)
+    for row in _rows(page.get("ocr") or []):
+        x, y = _center(row)
+        if (row["confidence"] < .9 or not _candidate_text(row, short=True)
+                or not 1280 <= row["bounds"][0] <= 1450 or not 168 <= y <= 790
+                or any(abs(y - entry["center"][1]) < 40 for entry in result)):
+            continue
+        if sum(abs(abs(y - entry["center"][1]) - 90) <= 15 for entry in anchors) >= 1:
+            result.append({"name": row["text"], "level": None,
+                           "confidence": row["confidence"], "center": [x, y]})
+    result.sort(key=lambda entry: entry["center"][1])
+    filled = []
+    for entry in result:
+        if filled and 165 <= entry["center"][1] - filled[-1]["center"][1] <= 195:
+            filled.append({"name": None, "level": None, "confidence": 0,
+                           "center": [1380, (entry["center"][1] + filled[-1]["center"][1]) / 2]})
+        filled.append(entry)
+    return filled
+
+
+def _same_roster_rows(left, right):
+    """Compare ordered UI rows; levels are transient alignment evidence only."""
+    if len(left) != len(right) or not left:
+        return False
+    named_matches = 0
+    uncertain_mismatches = 0
+    for a, b in zip(left, right):
+        if a.get("level") is not None and b.get("level") is not None and a["level"] != b["level"]:
+            return False
+        if a.get("name") and b.get("name"):
+            if not _name_compatible(a["name"], b["name"]):
+                if min(a.get("confidence", 1), b.get("confidence", 1)) >= .95:
+                    return False
+                uncertain_mismatches += 1
+            else:
+                named_matches += 1
+    # This only aligns list positions; it never verifies a character identity.
+    return named_matches >= min(2, len(left)) and uncertain_mismatches <= max(1, len(left) // 5)
+
+
+def _join_roster_pages(previous, current):
+    """Join overlapping ordered pages without collapsing same-name variants."""
+    if not previous:
+        return copy.deepcopy(current)
+    for overlap in range(min(len(previous), len(current)), 1, -1):
+        if _same_roster_rows(previous[-overlap:], current[:overlap]):
+            result = copy.deepcopy(previous)
+            for old, new in zip(result[-overlap:], current[:overlap]):
+                if new.get("name") and (not old.get("name") or
+                                       new.get("confidence", 0) > old.get("confidence", 0)):
+                    old["name"] = new["name"]
+                    old["confidence"] = new.get("confidence", 0)
+            return result + copy.deepcopy(current[overlap:])
+    raise RuntimeError("列表相邻页没有足够的有序重叠证据，未确认完整分母")
 
 
 def _identity_image_path(value):
@@ -461,6 +544,9 @@ def sanitize_quick_lookup_scan(kind, scan):
     if isinstance(scan.get("incremental"), dict):
         result["incremental"] = {key: copy.deepcopy(value) for key, value in
                                  scan["incremental"].items() if key in _SCAN_METADATA}
+    if isinstance(scan.get("scan_summary"), dict):
+        result["scan_summary"] = {key: copy.deepcopy(value) for key, value in
+                                  scan["scan_summary"].items() if key in _SCAN_METADATA}
     if isinstance(scan.get("last_detail_scan"), dict):
         last = scan["last_detail_scan"]
         result["last_detail_scan"] = {key: last[key] for key in
@@ -473,13 +559,17 @@ def parse_arcanum(items) -> dict[str, Any]:
     """Parse a card list/detail page without identifying artwork by guess."""
     rows = _rows(items)
     texts = _texts(rows)
-    if not any(term in texts for term in ("阿尔克那", "支援卡", "旅程初始效果", "训练效果")):
+    if not any(term in texts for term in ("阿尔克那", "阿尔克纳", "支援卡", "旅程效果", "旅程初始效果", "训练效果")):
         raise ValueError("当前画面不是阿尔克那/支援卡界面")
 
     level = _extract_level(rows)
     rarity = _extract_rarity(rows)
     effects = _extract_effects(rows)
-    header_names = _extract_names(rows, x_min=735, x_max=1250, y_min=240, y_max=322, short=False)
+    header_names = [(index, row) for index, row in enumerate(rows)
+                    if row["confidence"] >= .72 and 720 <= row["bounds"][0] <= 1250
+                    and 275 <= row["bounds"][1] <= 330
+                    and any("\u3400" <= char <= "\u9fff" for char in row["text"])
+                    and row["text"] not in _UI_TEXT]
     names = header_names or _extract_names(rows, x_min=80, x_max=1250, y_min=80, y_max=760, short=False)
     names = [(index, row) for index, row in names if row["text"] not in _UI_TEXT]
     # Prefer a long title near the middle of a detail page.  When there is
@@ -519,9 +609,139 @@ def _arcanum_detail_confirmed(items):
     return (any(row["text"] == "旅程效果" and row["confidence"] >= .72 and
                 500 <= row["bounds"][0] <= 720 and 240 <= row["bounds"][1] <= 300
                 for row in rows) and
-            any(row["text"] == "旅程初始效果" and row["confidence"] >= .72 and
+            any(_compact_text(row["text"]).lstrip("·•・") in {"旅程初始效果", "支持委托效果", "训练效果"}
+                and row["confidence"] >= .72 and
                 735 <= row["bounds"][0] <= 1250 and 370 <= row["bounds"][1] <= 415
                 for row in rows))
+
+
+def _arcanum_panel_confirmed(items):
+    rows = _rows(items)
+    return (any(row["text"] == "旅程效果" and row["confidence"] >= .72
+                and 500 <= row["bounds"][0] <= 720 and 240 <= row["bounds"][1] <= 300
+                for row in rows)
+            and any(row["text"] in {"专属效果", "旅程事件", "篇章"} and row["confidence"] >= .72
+                    and 500 <= row["bounds"][0] <= 720 and 300 <= row["bounds"][1] <= 480
+                    for row in rows))
+
+
+def _arcanum_grid_tiles(items):
+    """Only locate card artwork on the verified inventory grid."""
+    rows = _rows(items)
+    header = any(row["text"] in {"阿尔克那", "阿尔克纳"} and row["confidence"] >= .8
+                 and 150 <= row["bounds"][0] <= 370 and 20 <= row["bounds"][1] <= 100
+                 for row in rows)
+    manage = any(row["text"] == "管理" and row["confidence"] >= .8
+                 and 100 <= row["bounds"][0] <= 240 and 115 <= row["bounds"][1] <= 190
+                 for row in rows)
+    if not header or not manage or _arcanum_panel_confirmed(rows):
+        return []
+    tiles = []
+    for row in rows:
+        if (row["text"] not in {"SSR", "SR", "R", "N"} or row["confidence"] < .8
+                or not 320 <= row["bounds"][0] <= 1450
+                or not 260 <= row["bounds"][1] <= 830):
+            continue
+        x, _ = _center(row)
+        y = row["bounds"][1] - 140
+        if y < 175:
+            continue
+        if not any(abs(x - tile[0]) < 40 and abs(y - tile[1]) < 60 for tile in tiles):
+            tiles.append((x, y))
+    # R/SR/SSR have different glyph bounds; use the shared grid row baseline.
+    groups = []
+    for x, y in sorted(tiles, key=lambda tile: tile[1]):
+        group = next((row for row in groups if abs(y - row[0][1]) < 40), None)
+        if group is None:
+            groups.append([(x, y)])
+        else:
+            group.append((x, y))
+    normalized = []
+    for group in groups:
+        baseline = sorted(y for _, y in group)[len(group) // 2]
+        normalized.extend((410 + round((x - 410) / 194) * 194, baseline) for x, _ in group)
+    return sorted(normalized, key=lambda tile: (tile[1], tile[0]))
+
+
+def _arcanum_art_patch(frame, tile):
+    x, y = (int(value) for value in tile)
+    return frame[y + 55:y + 105, x - 90:x - 35].copy()
+
+
+def _locate_arcanum_art(frame, patch):
+    """Follow a static art fragment after Unity auto-scrolls the selected row."""
+    if patch.size == 0:
+        raise ValueError("卡面定位片段为空")
+    region = frame[155:815, 250:1460]
+    scores = cv2.matchTemplate(region, patch, cv2.TM_CCOEFF_NORMED)
+    _, score, _, point = cv2.minMaxLoc(scores)
+    if score < .92:
+        raise ValueError("原卡面不在当前可见区域或已变化")
+    x, y = point
+    height, width = patch.shape[:2]
+    scores[max(0, y-height):y+height, max(0, x-width):x+width] = -1
+    if cv2.minMaxLoc(scores)[1] >= .92:
+        raise ValueError("相同卡面出现多个位置，未唯一定位")
+    return (250 + x + width / 2) / 1600, (155 + y + height / 2) / 900
+
+
+def _arcanum_owned_count(items):
+    candidates = []
+    for row in _rows(items):
+        match = _COUNT.fullmatch(row["text"].replace(" ", ""))
+        if (match and row["confidence"] >= .85
+                and 1130 <= row["bounds"][0] <= 1300
+                and 95 <= row["bounds"][1] <= 145):
+            owned, capacity = map(int, match.groups())
+            if 0 < owned <= capacity <= 1000:
+                candidates.append(owned)
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _arcanum_patch_score(frame, tile, patch):
+    x, y = (round(value) for value in tile)
+    window = frame[max(155, y+35):min(815, y+125), max(250, x-110):min(1460, x-15)]
+    if patch.size == 0 or window.shape[0] < patch.shape[0] or window.shape[1] < patch.shape[1]:
+        return 0.0
+    return cv2.minMaxLoc(cv2.matchTemplate(window, patch, cv2.TM_CCOEFF_NORMED))[1]
+
+
+def _arcanum_patch_matches(frame, tile, patch):
+    return _arcanum_patch_score(frame, tile, patch) >= .92
+
+
+def _same_arcanum_view(before, after):
+    frame, rows = before
+    next_frame, next_rows = after
+    tiles, next_tiles = _arcanum_grid_tiles(rows), _arcanum_grid_tiles(next_rows)
+    return bool(tiles and len(tiles) == len(next_tiles)
+                and all(abs(x - a) < 12 and abs(y - b) < 12
+                        and _arcanum_patch_matches(next_frame, (a, b), _arcanum_art_patch(frame, (x, y)))
+                        for (x, y), (a, b) in zip(tiles, next_tiles)))
+
+
+def _index_arcanum_tiles(frame, items, patches, *, discover=False):
+    """Match only artwork fragments; no card stats or account data are persisted."""
+    indices = []
+    for tile in _arcanum_grid_tiles(items):
+        scores = [_arcanum_patch_score(frame, tile, patch) for patch in patches]
+        matches = [i for i, score in enumerate(scores) if score >= .92]
+        if len(matches) > 1:
+            raise ValueError("多个卡面片段匹配同一位置，未确认翻页")
+        if not matches:
+            if not discover:
+                x, y = map(round, tile)
+                raise ValueError(
+                    f"出现清点之外的卡片，列表可能已更改；"
+                    f"标准化位置=({x},{y})，最高卡面匹配分数={max(scores, default=0.0):.4f}")
+            matches = [len(patches)]
+            patches.append(_arcanum_art_patch(frame, tile))
+        if matches[0] in indices:
+            raise ValueError("同一卡面在本页出现多个位置，无法唯一计数")
+        indices.append(matches[0])
+    if not indices:
+        raise ValueError("未确认可见卡片，停止滚轮输入")
+    return indices
 
 
 def parse_journey_initial(items, expected_character: str | None = None) -> dict[str, Any]:
@@ -885,7 +1105,6 @@ class QuickLookupStore:
                 "retained": max(0, len(previous.get("roster_details") or []) - replaced),
                 "new_verified": appended,
                 "replaced": replaced,
-                "attempted": len(details),
             })
             merged_scan["roster_details"] = details
             merged_scan["roster_scan"] = current_scan
@@ -971,6 +1190,8 @@ class QuickLookupStore:
                             "replaced": 1 if replaced else 0})
         if scan_complete is not None:
             roster_scan["complete"] = bool(scan_complete)
+            if not scan_complete:
+                roster_scan["accepted"] = False
         rescuer["roster_scan"] = roster_scan
         data["rescuer"] = rescuer
         data["match"] = None
@@ -993,7 +1214,7 @@ class QuickLookupStore:
 class QuickLookupScanner:
     def __init__(self, root, window_title="StarSavior", capture=None, ocr=None,
                  controller=None, sleep=time.sleep, clock=time.monotonic, progress=None,
-                 should_stop=None, on_rescuer_entry=None):
+                 should_stop=None, on_rescuer_entry=None, on_arcanum_entry=None):
         self.root = Path(root)
         self.capture = capture or ScreenCapture(window_title)
         self.ocr = ocr or HybridOCR()
@@ -1005,10 +1226,18 @@ class QuickLookupScanner:
         self.progress = progress
         self.should_stop = should_stop or (lambda: False)
         self.on_rescuer_entry = on_rescuer_entry
+        self.on_arcanum_entry = on_arcanum_entry
         self.completed_count = 0
+        self.failed_characters = []
+        self.verified_identities = set()
+        self.inventory_complete = False
+        self.scan_total = None
         self.retry_count = 0
         self.last_observation = None
         self.stage = "waiting_foreground"
+        self.phase = None
+        self.scan_kind = None
+        self.task_id = None
         self.transitions = []
         self.discovered_roster = []
 
@@ -1068,33 +1297,45 @@ class QuickLookupScanner:
         self.last_observation = (frame, rows)
         return frame, rows
 
-    def _wait_page(self, hwnd, kind, *, expected_name=None, timeout=6.0, interval=.15):
+    def _wait_page(self, hwnd, kind, *, expected_name=None, timeout=12.0, interval=.15):
         """Require page and identity together on two consecutive captures."""
         self.stage = kind
+        self._report_progress(current=expected_name)
         deadline = self.clock() + max(.1, float(timeout))
         last_error = None
         accepted = 0
+        previous_signature = None
         while self.clock() < deadline:
             self._check_active(hwnd)
             frame, rows = self._read_frame(hwnd)
             try:
                 if _page_kind(rows) == kind:
+                    signature = None
+                    if kind == "rescuer_list":
+                        page = parse_rescuer(rows)
+                        signature = tuple((entry["name"], round(entry["center"][1] / 4))
+                                          for entry in page["roster"])
                     if expected_name:
                         page = (parse_journey_initial(rows, expected_name)
                                 if kind == "journey_initial" else parse_rescuer(rows))
                         self._verify_selected(page, expected_name)
-                    accepted += 1
+                    accepted = (accepted + 1 if signature == previous_signature else 1)
+                    previous_signature = signature
                     if accepted >= 2:
                         self.transitions.append({"page": kind, "character": expected_name,
                                                  "confirmed": True})
                         return frame, rows
                 else:
                     accepted = 0
+                    previous_signature = None
             except (ValueError, RuntimeError) as error:
                 last_error = error
                 accepted = 0
+                previous_signature = None
             self.sleep(interval)
-        raise RuntimeError(f"等待页面转场失败：{kind}" + (f"（{last_error}）" if last_error else ""))
+        observed = _page_kind(self.last_observation[1]) if self.last_observation else None
+        raise RuntimeError(f"等待页面转场失败：{kind}，识别页面：{observed or 'unknown'}"
+                           + (f"（{last_error}）" if last_error else ""))
 
     @staticmethod
     def _page_identity(page):
@@ -1124,14 +1365,14 @@ class QuickLookupScanner:
             if kind == "rescuer_list":
                 return frame, parse_rescuer(rows)
             if kind == "journey_initial":
-                self._click_fixed(hwnd, region, .889, .203,
-                                  "quick_lookup_recover_close_initial")
-                self._wait_page(hwnd, "rescuer_detail")
+                self._click_transition(hwnd, region, .889, .203,
+                                       "quick_lookup_recover_close_initial",
+                                       "journey_initial", "rescuer_detail")
                 continue
             if kind == "rescuer_detail":
-                self._click_fixed(hwnd, region, .043, .064,
-                                  "quick_lookup_recover_back_detail")
-                frame, list_rows = self._wait_page(hwnd, "rescuer_list")
+                frame, list_rows = self._click_transition(
+                    hwnd, region, .043, .064, "quick_lookup_recover_back_detail",
+                    "rescuer_detail", "rescuer_list")
                 return frame, parse_rescuer(list_rows)
             raise RuntimeError("无法安全恢复角色列表，当前页面未确认")
         raise RuntimeError("恢复角色列表超时")
@@ -1141,7 +1382,14 @@ class QuickLookupScanner:
         if not self.progress:
             return
         try:
-            self.progress({"attempted": self.completed_count, "failed": 0,
+            total = (self.scan_total if self.scan_kind == "arcanum"
+                     else len(self.discovered_roster) if self.inventory_complete else None)
+            self.progress({"attempted": self.completed_count + len(self.failed_characters),
+                           "succeeded": self.completed_count,
+                           "failed": len(self.failed_characters), "total": total,
+                           "inventory_complete": self.inventory_complete,
+                           "success_rate": self.completed_count / total if total else None,
+                           "phase": self.phase, "discovered": len(self.discovered_roster),
                            "retries": self.retry_count, "current": current,
                            "read_attempts": read_attempts, "stage": self.stage,
                            "last_retry_error": error})
@@ -1149,31 +1397,39 @@ class QuickLookupScanner:
             # A UI update must not affect game input or verification.
             pass
 
+    def _record_step(self, scan_id, event, character=None):
+        self.stage = event
+        self._report_progress(current=character)
+        try:
+            append_event(self.root, self.scan_kind or "rescuer", event,
+                         scan_id=scan_id, task_id=self.task_id, stage=event,
+                         character=character)
+        except OSError:
+            pass
+
     def _record_retry(self, scan_id, name, attempt, error):
         """Keep retry reasons in ignored runtime logs, bounded in each record."""
         try:
-            path = self.root / "runtime" / "quick_lookup_events.jsonl"
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("a", encoding="utf-8") as stream:
-                stream.write(json.dumps({"scan_id": scan_id, "event": "read_retry",
-                    "character": name, "attempt": attempt, "stage": self.stage,
-                    "error": str(error),
-                    "ts": datetime.now().astimezone().isoformat()}, ensure_ascii=False) + "\n")
+            record = {"scan_id": scan_id, "task_id": self.task_id,
+                      "character": name, "attempt": attempt, "stage": self.stage,
+                      "error": f"{type(error).__name__}: {error}"}
+            if self.last_observation:
+                rows = self.last_observation[1]
+                record["observed_page"] = _page_kind(rows)
+                markers = {"救援者", "查看详情", "基本", "旅程初始信息", "潜质",
+                           "救援者介绍", "阿尔克那", "旅程效果", "旅程初始效果"}
+                record["markers"] = [{"text": row["text"],
+                                      "confidence": round(row["confidence"], 3)}
+                                     for row in _rows(rows) if row["text"] in markers]
+            append_event(self.root, self.scan_kind or "rescuer", "read_retry", **record)
         except OSError:
             pass
 
     def _retry_rescuer_entry(self, scan_id, region, hwnd, name, slot,
-                             *, select_roster=True):
-        """Read one roster entry until the complete evidence path succeeds.
-
-        A row is never converted into a skipped/failed result merely because
-        one click or OCR frame was wrong.  Every retry starts with a fresh list
-        frame, confirms the target row again, and only then sends input.  The
-        loop leaves immediately when the game loses the foreground; in every
-        other case it waits, safely recovers a known page, and retries the same
-        character.
-        """
+                             *, select_roster=True, max_attempts=3, row_id=None):
+        """Retry a role, then fail it only after recovering a confirmed list."""
         attempts = 0
+        recovery_failures = 0
         retry_errors = []
         while True:
             attempts += 1
@@ -1191,8 +1447,14 @@ class QuickLookupScanner:
                         raise RuntimeError("当前选中的角色名未确认，重试读取")
                 if select_roster:
                     self.stage = "select_rescuer"
-                    matches = [item for item in list_page.get("roster") or []
-                               if _name_compatible(name, str(item.get("name") or ""))]
+                    if row_id is not None:
+                        matches = [item for item in self._locate_roster_view(list_page)
+                                   if item["row_id"] == row_id]
+                        if matches and matches[0].get("name"):
+                            name = matches[0]["name"]
+                    else:
+                        matches = [item for item in list_page.get("roster") or []
+                                   if _name_compatible(name, str(item.get("name") or ""))]
                     if len(matches) != 1:
                         raise RuntimeError(f"未能唯一定位角色行：{name}")
                     x, y = _roster_click_percent(matches[0], list_frame.shape[1],
@@ -1208,6 +1470,8 @@ class QuickLookupScanner:
                     hwnd, "rescuer_list", expected_name=name)
                 selected_page = parse_rescuer(selected_rows)
                 selected = self._verify_selected(selected_page, name)
+                if _full_rescuer_name(selected, selected_page.get("title")) in self.verified_identities:
+                    raise RuntimeError("选中的是本轮已验证的同名版本，未将重复身份计为新成功")
                 detail = self._read_rescuer_detail(
                     scan_id, region, hwnd, selected_frame, selected_page, slot,
                     expected_name=name)
@@ -1233,16 +1497,27 @@ class QuickLookupScanner:
                 try:
                     self._recover_to_rescuer_list(
                         region, hwnd, expected_name=name)
+                    recovery_failures = 0
+                    if attempts >= max_attempts:
+                        raise QuickLookupEntryFailed(
+                            f"{name or '当前角色'}连续 {attempts} 次读取失败，已安全返回列表：{error}")
+                except QuickLookupEntryFailed:
+                    raise
                 except QuickLookupInterrupted:
                     raise
                 except Exception as recovery_error:
                     self._check_active(hwnd)
+                    self._record_retry(scan_id, name, attempts, recovery_error)
+                    recovery_failures += 1
+                    if recovery_failures >= 3:
+                        raise RuntimeError("连续三次无法确认恢复页面，扫描已停止；请查看分类日志") from recovery_error
                     retry_errors.append(
                         f"恢复页面: {type(recovery_error).__name__}: {recovery_error}")
                     retry_errors = retry_errors[-20:]
                 self.sleep(min(1.5, 0.25 * attempts))
 
     def scan(self, kind, traverse_rescuer=True, max_rescuers=100):
+        self.scan_kind = kind
         if kind not in {"rescuer", "arcanum"}:
             raise ValueError("扫描类型无效")
         region, hwnd = self.wait_for_foreground()
@@ -1250,20 +1525,23 @@ class QuickLookupScanner:
         if frame.shape[:2] != (900, 1600):
             frame = cv2.resize(frame, (1600, 900), interpolation=cv2.INTER_AREA)
         items = self.ocr.recognize_detailed(frame)
+        self.last_observation = (frame, items)
+        if kind == "rescuer" and _page_kind(items) in {"rescuer_detail", "journey_initial"}:
+            frame, page = self._recover_to_rescuer_list(region, hwnd)
+            items = page["ocr"]
         if kind == "rescuer" and _page_kind(items) != "rescuer_list":
             raise ValueError("当前不是救援者列表页，请打开救援者界面后重试")
-        parser = parse_rescuer if kind == "rescuer" else parse_arcanum
-        parsed = parser(items)
         scan_id = uuid.uuid4().hex
-        parsed.update({"scan_id": scan_id, "observed_at": datetime.now().astimezone().isoformat()})
         if kind == "arcanum":
-            if not _arcanum_detail_confirmed(items) or not _name_value(parsed["cards"][0].get("name")):
-                raise ValueError("阿尔克那详情和卡名未确认，请打开旅程效果详情后重新读取")
-            identity = self._save_crop(scan_id, "arcanum_identity", frame,
-                                       _IDENTITY_BOXES["arcanum"])
-            for card in parsed.get("cards") or []:
-                card["image"] = identity
+            if _arcanum_grid_tiles(items):
+                return self._scan_arcanum_library(scan_id, region, hwnd)
+            return self._scan_arcanum_page(scan_id, region, hwnd, frame, items)
+        parsed = parse_rescuer(items)
+        parsed.update({"scan_id": scan_id, "observed_at": datetime.now().astimezone().isoformat()})
         if kind == "rescuer" and traverse_rescuer:
+            self._inventory_rescuers(scan_id, region, hwnd)
+            if not self.inventory_complete:
+                raise RuntimeError("列表清点不完整，未开始详情采集；请查看 inventory_page 日志")
             details, traversal = self._traverse_rescuers(
                 scan_id, region, hwnd, frame, parsed, max_rescuers=max_rescuers)
             parsed["roster_details"] = details
@@ -1275,8 +1553,291 @@ class QuickLookupScanner:
                 scan_id, "rescuer_identity", frame, _IDENTITY_BOXES["rescuer"])
         return sanitize_quick_lookup_scan(kind, parsed)
 
+    def _wait_arcanum_page(self, hwnd, kind, timeout=8):
+        self.stage = f"arcanum_{kind}"
+        self._report_progress()
+        deadline = self.clock() + timeout
+        previous = None
+        previous_view = None
+        while self.clock() < deadline:
+            frame, items = self._read_frame(hwnd)
+            if kind == "grid":
+                tiles = _arcanum_grid_tiles(items)
+                if tiles and previous_view and _same_arcanum_view(previous_view, (frame, items)):
+                    return frame, items
+                previous_view = (frame, items) if tiles else None
+                self.sleep(.2)
+                continue
+            elif kind == "panel":
+                signature = "panel" if _arcanum_panel_confirmed(items) else None
+            else:
+                signature = (_name_value(parse_arcanum(items)["cards"][0].get("name"))
+                             if _arcanum_detail_confirmed(items) else None)
+            if signature and signature == previous:
+                return frame, items
+            previous = signature
+            self.sleep(.2)
+        raise RuntimeError(f"阿尔克纳页面确认超时：{kind}")
+
+    def _read_arcanum_card(self, scan_id, frame, items, slot=None):
+        if not _arcanum_detail_confirmed(items):
+            raise ValueError("未确认阿尔克纳旅程效果详情")
+        parsed = parse_arcanum(items)
+        name = _name_value(parsed["cards"][0].get("name"))
+        # Only the card-title band may supply a live scan name.
+        if not name or not any(row["text"] == name and row["confidence"] >= .72
+                               and 720 <= row["bounds"][0] <= 1250
+                               and 275 <= row["bounds"][1] <= 330 for row in _rows(items)):
+            raise ValueError("阿尔克纳卡名未在标题区域确认")
+        identity = self._save_crop(scan_id, "arcanum_identity", frame,
+                                   _IDENTITY_BOXES["arcanum"], str(slot) if slot else None)
+        parsed["cards"][0]["image"] = identity
+        parsed.update(scan_id=scan_id, observed_at=datetime.now().astimezone().isoformat())
+        return parsed
+
+    def _arcanum_effect_page(self, hwnd, region, frame, items):
+        if _arcanum_detail_confirmed(items):
+            return frame, items
+        if not _arcanum_panel_confirmed(items):
+            raise ValueError("当前不是阿尔克纳详情页，未发送输入")
+        label = self._find_label(items, {"旅程效果"})
+        if not label:
+            raise ValueError("旅程效果标签未确认")
+        self._click_row(hwnd, region, label, "quick_lookup_arcanum_effect",
+                        (frame.shape[1], frame.shape[0]))
+        return self._wait_arcanum_page(hwnd, "effects")
+
+    def _close_arcanum(self, scan_id, hwnd, region):
+        for attempt in range(3):
+            _, rows = self._read_frame(hwnd)
+            if _arcanum_grid_tiles(rows):
+                return self._wait_arcanum_page(hwnd, "grid")
+            if not (_arcanum_panel_confirmed(rows) or _arcanum_detail_confirmed(rows)):
+                raise RuntimeError("阿尔克纳当前页面未确认，未猜测关闭位置")
+            self._record_step(scan_id, "arcanum_closing")
+            self._click_fixed(hwnd, region, .858, .254, "quick_lookup_close_arcanum")
+            try:
+                result = self._wait_arcanum_page(hwnd, "grid", timeout=4)
+                self._record_step(scan_id, "arcanum_returned_to_grid")
+                return result
+            except QuickLookupInterrupted:
+                raise
+            except RuntimeError:
+                if attempt == 2:
+                    raise
+
+    def _scan_arcanum_page(self, scan_id, region, hwnd, frame, items):
+        self.phase = "arcanum_cards"
+        if _arcanum_detail_confirmed(items) or _arcanum_panel_confirmed(items):
+            frame, items = self._arcanum_effect_page(hwnd, region, frame, items)
+            parsed = self._read_arcanum_card(scan_id, frame, items)
+            self.completed_count = 1
+            self.scan_total = 1
+            self._record_step(scan_id, "arcanum_card_collected",
+                              _name_value(parsed["cards"][0]["name"]))
+            parsed["scan_summary"] = {"attempted": 1, "succeeded": 1,
+                                      "failed": 0, "total": 1, "complete": True}
+            return sanitize_quick_lookup_scan("arcanum", parsed)
+        tiles = _arcanum_grid_tiles(items)
+        if not tiles:
+            raise ValueError("请打开阿尔克纳卡片列表或详情页，当前页面未确认")
+        self.scan_total = len(tiles)
+        patches = [_arcanum_art_patch(frame, tile) for tile in tiles]
+        cards = []
+        self._record_step(scan_id, "arcanum_grid_started")
+        for index, patch in enumerate(patches, 1):
+            self._check_active(hwnd)
+            self._report_progress(current=f"卡片 {index}/{len(tiles)}")
+            current_frame, current = self._wait_arcanum_page(hwnd, "grid")
+            try:
+                x, y = _locate_arcanum_art(current_frame, patch)
+                self._click_fixed(hwnd, region, x, y,
+                                  "quick_lookup_open_arcanum")
+                card_frame, card_rows = self._wait_arcanum_page(hwnd, "panel")
+                card_frame, card_rows = self._arcanum_effect_page(hwnd, region, card_frame, card_rows)
+                parsed = self._read_arcanum_card(scan_id, card_frame, card_rows, index)
+                self._record_step(scan_id, "arcanum_card_collected",
+                                  _name_value(parsed["cards"][0]["name"]))
+                self._close_arcanum(scan_id, hwnd, region)
+                if self.on_arcanum_entry:
+                    parsed["scan_summary"] = {"attempted": index,
+                        "succeeded": self.completed_count + 1, "failed": len(self.failed_characters),
+                        "total": len(tiles), "complete": False}
+                    self.on_arcanum_entry(parsed)
+                cards.extend(parsed["cards"])
+                self.completed_count += 1
+            except QuickLookupInterrupted:
+                raise
+            except (ValueError, RuntimeError) as error:
+                self.failed_characters.append(f"卡片 {index}")
+                self._record_retry(scan_id, f"卡片 {index}", 1, error)
+                self._close_arcanum(scan_id, hwnd, region)
+            self._report_progress()
+        return sanitize_quick_lookup_scan("arcanum", {
+            "cards": cards, "scan_id": scan_id,
+            "observed_at": datetime.now().astimezone().isoformat(),
+            "scan_summary": {"attempted": len(tiles), "succeeded": len(cards),
+                             "failed": len(self.failed_characters), "total": len(tiles),
+                             "complete": not self.failed_characters,
+                             "stop_reason": "部分卡片读取失败，已返回列表" if self.failed_characters else None}})
+
+    def _scroll_arcanum(self, scan_id, hwnd, clicks, *, x=.6):
+        before = self._wait_arcanum_page(hwnd, "grid")
+        self._check_active(hwnd)
+        self.stage = "arcanum_scrolling"
+        self._report_progress()
+        self.controller.scroll_at_percent(x, .55, clicks=clicks,
+                                          source="quick_lookup_arcanum_scroll")
+        self.sleep(.3)
+        after = self._wait_arcanum_page(hwnd, "grid")
+        moved = not _same_arcanum_view(before, after)
+        append_event(self.root, "arcanum", "arcanum_scroll", task_id=self.task_id,
+                     scan_id=scan_id, direction="down" if clicks < 0 else "up",
+                     moved=moved)
+        return after, moved
+
+    def _arcanum_to_top(self, scan_id, hwnd):
+        unchanged = 0
+        for _ in range(80):
+            view, moved = self._scroll_arcanum(scan_id, hwnd, 4)
+            unchanged = 0 if moved else unchanged + 1
+            if unchanged >= 2:
+                view, moved = self._scroll_arcanum(scan_id, hwnd, 6, x=.8)
+                if not moved:
+                    return view
+                unchanged = 0
+        raise RuntimeError("未确认阿尔克纳列表顶部，停止全库扫描")
+
+    def _arcanum_inventory(self, scan_id, region, hwnd):
+        self.controller.set_window_handle(hwnd)
+        self.controller.set_game_region(region)
+        self.phase = "arcanum_inventory"
+        self._record_step(scan_id, "arcanum_inventory_started")
+        view = self._arcanum_to_top(scan_id, hwnd)
+        expected = _arcanum_owned_count(view[1])
+        if expected is None:
+            raise RuntimeError("未确认阿尔克纳列表总数，不能判定全库扫描完成")
+        self.scan_total = expected
+        patches = []
+        stagnant = 0
+        bottom = False
+        previous = None
+        for page in range(1, 121):
+            if _arcanum_owned_count(view[1]) != expected:
+                raise RuntimeError("扫描期间阿尔克纳数量变化，停止扫描")
+            visible = _index_arcanum_tiles(*view, patches, discover=True)
+            if previous is not None and not set(previous) & set(visible):
+                raise RuntimeError("相邻卡片页没有重叠，未确认滚轮没有跳过卡片")
+            append_event(self.root, "arcanum", "arcanum_inventory_page", task_id=self.task_id,
+                         scan_id=scan_id, page=page, discovered=len(patches), total=expected)
+            self._report_progress(current=f"清点 {len(patches)}/{expected}")
+            if len(patches) > expected:
+                raise RuntimeError("卡面去重数量超过列表总数，未确认全库")
+            if stagnant >= 2:
+                verified, moved = self._scroll_arcanum(scan_id, hwnd, -4, x=.8)
+                if not moved:
+                    bottom = True
+                    break
+                stagnant = 0
+                view = verified
+                previous = visible
+                continue
+            previous = visible
+            view, moved = self._scroll_arcanum(scan_id, hwnd, -2)
+            stagnant = 0 if moved else stagnant + 1
+        if not bottom or len(patches) != expected:
+            raise RuntimeError(f"全库清点未完成：识别 {len(patches)} / 总数 {expected}，未标记成功")
+        self.inventory_complete = True
+        self._record_step(scan_id, "arcanum_inventory_finished")
+        return patches, self._arcanum_to_top(scan_id, hwnd)
+
+    def _scan_arcanum_library(self, scan_id, region, hwnd):
+        patches, view = self._arcanum_inventory(scan_id, region, hwnd)
+        self.phase = "arcanum_library"
+        attempted = set()
+        cards = []
+        last_error = None
+        stagnant = 0
+        bottom = False
+        for page in range(1, 121):
+            self._check_active(hwnd)
+            if _arcanum_owned_count(view[1]) != self.scan_total:
+                raise RuntimeError("扫描期间阿尔克纳数量变化")
+            visible = _index_arcanum_tiles(*view, patches)
+            for index in visible:
+                if index in attempted:
+                    continue
+                label = f"卡片 {index + 1}/{self.scan_total}"
+                self._report_progress(current=label)
+                success = False
+                for attempt in range(1, 3):
+                    self._check_active(hwnd)
+                    current_frame, current = self._wait_arcanum_page(hwnd, "grid")
+                    try:
+                        x, y = _locate_arcanum_art(current_frame, patches[index])
+                        self._click_fixed(hwnd, region, x, y, "quick_lookup_open_arcanum")
+                        card_frame, card_rows = self._wait_arcanum_page(hwnd, "panel")
+                        card_frame, card_rows = self._arcanum_effect_page(
+                            hwnd, region, card_frame, card_rows)
+                        parsed = self._read_arcanum_card(scan_id, card_frame, card_rows, index + 1)
+                        self._record_step(scan_id, "arcanum_card_collected",
+                                          _name_value(parsed["cards"][0]["name"]))
+                        view = self._close_arcanum(scan_id, hwnd, region)
+                        if self.on_arcanum_entry:
+                            parsed["scan_summary"] = {
+                                "attempted": len(attempted) + 1, "succeeded": len(cards) + 1,
+                                "failed": len(self.failed_characters), "total": self.scan_total,
+                                "mode": "library", "complete": False}
+                            self.on_arcanum_entry(parsed)
+                        cards.extend(parsed["cards"])
+                        self.completed_count += 1
+                        success = True
+                        break
+                    except QuickLookupInterrupted:
+                        raise
+                    except (ValueError, RuntimeError) as error:
+                        last_error = str(error)
+                        self.retry_count += 1
+                        self._record_retry(scan_id, label, attempt, error)
+                        view = self._close_arcanum(scan_id, hwnd, region)
+                attempted.add(index)
+                if not success:
+                    self.failed_characters.append(label)
+                self._report_progress()
+            view = self._wait_arcanum_page(hwnd, "grid")
+            # Selecting a lower row can auto-scroll new cards into view.
+            # Process those before issuing another wheel event.
+            if any(index not in attempted for index in _index_arcanum_tiles(*view, patches)):
+                stagnant = 0
+                continue
+            if stagnant >= 2:
+                view, moved = self._scroll_arcanum(scan_id, hwnd, -4, x=.8)
+                if not moved:
+                    bottom = True
+                    break
+                stagnant = 0
+                continue
+            view, moved = self._scroll_arcanum(scan_id, hwnd, -2)
+            stagnant = 0 if moved else stagnant + 1
+        exhaustive = bottom and len(attempted) == self.scan_total
+        complete = exhaustive and not self.failed_characters
+        summary = {"mode": "library", "attempted": len(attempted), "succeeded": len(cards),
+                   "failed": len(self.failed_characters), "total": self.scan_total,
+                   "inventory_complete": True, "complete": complete,
+                   "success_rate": len(cards) / self.scan_total,
+                   "failed_characters": self.failed_characters,
+                   "stop_reason": None if complete else
+                       (last_error or "未尝试完整卡库，已保留成功记录")}
+        append_event(self.root, "arcanum", "arcanum_library_summary",
+                     task_id=self.task_id, scan_id=scan_id, **summary)
+        return sanitize_quick_lookup_scan("arcanum", {
+            "cards": cards, "scan_id": scan_id,
+            "observed_at": datetime.now().astimezone().isoformat(),
+            "scan_summary": summary})
+
     def scan_selected_rescuer(self):
         """Force-read the currently selected rescuer and return one detail row."""
+        self.scan_kind = "rescuer"
         region, hwnd = self.wait_for_foreground()
         self.controller.set_window_handle(hwnd)
         self.controller.set_game_region(region)
@@ -1310,6 +1871,128 @@ class QuickLookupScanner:
                             "stop_reason": None, "max_rescuers": 1},
         })
 
+    @staticmethod
+    def _missing_roster_rows(page):
+        """Check full visible row anchors, allowing extra partial edge names."""
+        matched = {index for item in page.get("roster", [])
+                   for index in item.get("level_evidence", item.get("evidence", []))}
+        return [{"y": round(row["bounds"][1], 1)} for index, row in
+                enumerate(_rows(page.get("ocr") or []))
+                if index not in matched and _LEVEL.match(row["text"])
+                and row["confidence"] >= .5
+                and 1180 <= row["bounds"][0] <= 1530
+                and 145 <= row["bounds"][1] <= 750]
+
+    @staticmethod
+    def _roster_page_complete(page):
+        return bool(page.get("roster")) and not QuickLookupScanner._missing_roster_rows(page)
+
+    def _locate_roster_view(self, page):
+        visible = _physical_roster(page)
+        matches = [index for index in range(len(self.discovered_roster) - len(visible) + 1)
+                   if _same_roster_rows(self.discovered_roster[index:index + len(visible)], visible)]
+        if len(matches) != 1:
+            raise RuntimeError("当前列表行无法与完整清单唯一对齐")
+        offset = matches[0]
+        return [{**entry, "row_id": offset + i,
+                 "name": entry.get("name") or self.discovered_roster[offset + i].get("name")}
+                for i, entry in enumerate(visible)]
+
+    def _seek_roster_top(self, hwnd, observe=None):
+        previous = None
+        unchanged = 0
+        for _ in range(32):
+            _, rows = self._wait_page(hwnd, "rescuer_list")
+            page = parse_rescuer(rows)
+            if observe:
+                observe(page)
+            signature = _physical_roster(page)
+            if not signature:
+                raise RuntimeError("无法确认列表顶部：角色行未识别")
+            unchanged = unchanged + 1 if previous and _same_roster_rows(signature, previous) else 0
+            if unchanged >= 2:
+                self.controller.scroll_at_percent(.94, .54, clicks=8,
+                                                  source="quick_lookup_confirm_top")
+                _, verified_rows = self._wait_page(hwnd, "rescuer_list")
+                verified = parse_rescuer(verified_rows)
+                if observe:
+                    observe(verified)
+                if _same_roster_rows(_physical_roster(verified), signature):
+                    return
+                unchanged = 0
+            previous = signature
+            self.controller.scroll_at_percent(.87, .54, clicks=3,
+                                              source="quick_lookup_seek_top")
+        raise RuntimeError("未确认列表顶部，不计算完整列表通过率")
+
+    def _inventory_rescuers(self, scan_id, region, hwnd):
+        """Census the whole list first, independent of successful detail reads."""
+        self.controller.set_window_handle(hwnd)
+        self.controller.set_game_region(region)
+        self.phase = "inventory"
+        self._record_step(scan_id, "inventory_started")
+        self._seek_roster_top(hwnd)
+        known = []
+        previous = None
+        unchanged = 0
+        moved = False
+        for _ in range(64):
+            _, rows = self._wait_page(hwnd, "rescuer_list")
+            page = parse_rescuer(rows)
+            visible = _physical_roster(page)
+            if not visible:
+                raise RuntimeError("列表清点未识别到角色")
+            known = _join_roster_pages(known, visible)
+            signature = visible
+            same = bool(previous and _same_roster_rows(signature, previous))
+            moved = moved or (previous is not None and not same)
+            append_event(self.root, "rescuer", "inventory_page",
+                         task_id=self.task_id, scan_id=scan_id,
+                         characters=[entry["name"] for entry in signature],
+                         missing_rows=self._missing_roster_rows(page), counted_rows=len(known))
+            unchanged = unchanged + 1 if same else 0
+            self.discovered_roster = [{**entry, "row_id": i} for i, entry in enumerate(known)]
+            self._report_progress()
+            if unchanged >= 2:
+                self.controller.scroll_at_percent(.94, .54, clicks=-6,
+                                                  source="quick_lookup_confirm_bottom")
+                _, verified_rows = self._wait_page(hwnd, "rescuer_list")
+                verified = parse_rescuer(verified_rows)
+                if _same_roster_rows(_physical_roster(verified), signature):
+                    if not moved:
+                        raise RuntimeError("未观察到列表实际滚动，无法证明完整列表边界")
+                    self.inventory_complete = True
+                    break
+                unchanged = 0
+            previous = signature
+            self.controller.scroll_at_percent(.87, .54, clicks=-3,
+                                              source="quick_lookup_inventory_scroll")
+        else:
+            raise RuntimeError("未确认列表底部，不计算完整列表通过率")
+        reverse_rows = []
+        def observe_reverse(page):
+            nonlocal reverse_rows
+            rows = _physical_roster(page)
+            reverse_rows = _join_roster_pages(rows, reverse_rows) if reverse_rows else rows
+            append_event(self.root, "rescuer", "inventory_page",
+                         task_id=self.task_id, scan_id=scan_id, direction="up",
+                         characters=[row["name"] for row in rows],
+                         missing_rows=self._missing_roster_rows(page))
+        self._seek_roster_top(hwnd, observe=observe_reverse)
+        self.inventory_complete = bool(self.inventory_complete
+                                       and _same_roster_rows(reverse_rows, known))
+        if self.inventory_complete:
+            for entry, reverse in zip(known, reverse_rows):
+                if not entry.get("name") and reverse.get("name"):
+                    entry["name"] = reverse["name"]
+            self.discovered_roster = [{**entry, "row_id": i} for i, entry in enumerate(known)]
+        self._record_step(scan_id, "inventory_finished")
+        append_event(self.root, "rescuer", "inventory_summary",
+                     task_id=self.task_id, scan_id=scan_id, total=len(known),
+                     inventory_complete=self.inventory_complete,
+                     reverse_total=len(reverse_rows),
+                     characters=[entry["name"] for entry in known])
+
     def _traverse_rescuers(self, scan_id, region, hwnd, initial_frame,
                            initial, *, max_rescuers=100):
         """Read every OCR-confirmed rescuer row, scrolling the right list.
@@ -1321,6 +2004,7 @@ class QuickLookupScanner:
         """
         self.controller.set_window_handle(hwnd)
         self.controller.set_game_region(region)
+        self.phase = "collect"
         details = []
         seen = set()
         stagnant_scrolls = 0
@@ -1328,9 +2012,12 @@ class QuickLookupScanner:
         complete = False
         stop_reason = None
         list_read_retries = 0
-        self.discovered_roster = []
+        ordinal_inventory = bool(self.discovered_roster
+                                 and all("row_id" in row for row in self.discovered_roster))
 
         def remember_roster(rows):
+            if ordinal_inventory:
+                return
             positions = {str(item.get("name") or "").strip(): index
                          for index, item in enumerate(self.discovered_roster)
                          if str(item.get("name") or "").strip()}
@@ -1341,6 +2028,8 @@ class QuickLookupScanner:
                 if name in positions:
                     self.discovered_roster[positions[name]] = copy.deepcopy(item)
                 else:
+                    if self.inventory_complete:
+                        self.inventory_complete = False
                     positions[name] = len(self.discovered_roster)
                     self.discovered_roster.append(copy.deepcopy(item))
 
@@ -1348,7 +2037,8 @@ class QuickLookupScanner:
             try:
                 current_frame, current_rows = self._wait_page(hwnd, "rescuer_list")
                 current_page = parse_rescuer(current_rows)
-                entries = list(current_page.get("roster") or [])
+                entries = (self._locate_roster_view(current_page) if ordinal_inventory
+                           else list(current_page.get("roster") or []))
                 if not entries:
                     raise RuntimeError("右侧角色列表未识别，继续等待后重试")
                 remember_roster(entries)
@@ -1366,16 +2056,33 @@ class QuickLookupScanner:
                 continue
             for entry in entries:
                 name = str(entry.get("name") or "").strip()
-                if not name or name in seen:
+                key = entry["row_id"] if ordinal_inventory else name
+                if key in seen or (not name and not ordinal_inventory):
                     continue
                 try:
+                    if not name:
+                        name = f"未识别角色（列表第 {key + 1} 行）"
+                        raise QuickLookupEntryFailed("该行名称未确认，计为失败，不发送猜测点击")
+                    options = {"row_id": key} if ordinal_inventory else {}
                     selected, page, detail, screenshot, attempts, retry_errors = (
                         self._retry_rescuer_entry(
-                            scan_id, region, hwnd, name, next_slot))
+                            scan_id, region, hwnd, name, next_slot, **options))
                 except QuickLookupInterrupted as error:
                     stop_reason = str(error)
                     break
-                seen.add(name)
+                except QuickLookupEntryFailed as error:
+                    seen.add(key)
+                    self.failed_characters.append(name)
+                    next_slot += 1
+                    self._record_step(scan_id, "entry_failed", name)
+                    append_event(self.root, "rescuer", "entry_failure_reason",
+                                 task_id=self.task_id, scan_id=scan_id,
+                                 character=name, error=str(error))
+                    if len(seen) >= max_rescuers:
+                        break
+                    continue
+                seen.add(key)
+                self.verified_identities.add(_full_rescuer_name(selected, page.get("title")))
                 entry_detail = {
                     "slot": next_slot,
                     "character": selected,
@@ -1389,7 +2096,7 @@ class QuickLookupScanner:
                 if self.on_rescuer_entry:
                     self.on_rescuer_entry(entry_detail, page, scan_id)
                 next_slot += 1
-                self.completed_count = len(seen)
+                self.completed_count = len(details)
                 self._report_progress()
                 if len(seen) >= max_rescuers:
                     break
@@ -1434,7 +2141,21 @@ class QuickLookupScanner:
             complete = True
         elif not stop_reason and not is_window_foreground(hwnd):
             stop_reason = "游戏失去前台，扫描安全停止"
-        return details, {"complete": complete, "attempted": len(seen), "failed": 0,
+        total = len(self.discovered_roster)
+        if complete and len(seen) != total:
+            complete = False
+            stop_reason = "列表清点和实际尝试数量不一致"
+        rate = len(details) / total if total and self.inventory_complete else None
+        accepted = bool(complete and rate is not None and rate >= .90)
+        if complete and not accepted:
+            stop_reason = ("列表中存在未识别行，分母尚未完整确认" if rate is None
+                           else f"本轮通过率 {rate:.1%}，未达到 90%")
+        return details, {"complete": complete, "attempted": len(seen),
+                         "failed": len(self.failed_characters), "succeeded": len(details),
+                         "total": total, "inventory_complete": self.inventory_complete,
+                         "success_rate": rate, "accepted": accepted,
+                         "acceptance_threshold": .9,
+                         "failed_characters": list(self.failed_characters),
                          "retries": self.retry_count, "stop_reason": stop_reason,
                          "max_rescuers": max_rescuers}
 
@@ -1469,6 +2190,34 @@ class QuickLookupScanner:
         self.controller.set_game_region(region)
         self.controller.click_at_percent(x, y, fast=False, source=source)
 
+    def _click_transition(self, hwnd, region, x, y, source, origin, target,
+                          *, expected_name=None):
+        """Retry an ignored navigation click only while the origin is confirmed."""
+        for attempt in range(1, 4):
+            self._check_active(hwnd)
+            self.sleep(.25)
+            self._click_fixed(hwnd, region, x, y, source)
+            try:
+                return self._wait_page(hwnd, target, expected_name=expected_name, timeout=4.0)
+            except QuickLookupInterrupted:
+                raise
+            except RuntimeError:
+                frame, rows = self._read_frame(hwnd)
+                page_kind = _page_kind(rows)
+                if page_kind == target:
+                    return self._wait_page(hwnd, target, expected_name=expected_name)
+                if attempt == 3 or page_kind != origin:
+                    raise
+                if expected_name:
+                    page = (parse_journey_initial(rows, expected_name)
+                            if origin == "journey_initial" else parse_rescuer(rows))
+                    self._verify_selected(page, expected_name)
+                self.retry_count += 1
+                self._report_progress(current=expected_name, error="导航点击未响应，核对原页面后重试")
+                append_event(self.root, "rescuer", "navigation_retry",
+                             task_id=self.task_id, stage=self.stage,
+                             action=source, attempt=attempt, observed_page=origin)
+
     def _read_rescuer_detail(self, scan_id, region, hwnd, selected_frame, page, slot,
                              *, expected_name=None):
         """Traverse detail -> initial modal -> detail -> list with proof."""
@@ -1502,20 +2251,26 @@ class QuickLookupScanner:
         result["journey_initial"] = initial
         result["journey_initial_portrait"] = portrait_path
         result["uncertain"].extend(initial.get("uncertain") or [])
+        self._record_step(scan_id, "initial_info_collected", expected_name)
 
         # The modal X is commonly missed by OCR; the verified modal kind is
         # the safety proof for this fixed hotspot.
-        self._click_fixed(hwnd, region, 0.889, 0.203, "quick_lookup_close_initial")
-        detail_frame, detail_rows = self._wait_page(hwnd, "rescuer_detail", expected_name=expected_name)
+        self._record_step(scan_id, "closing_initial", expected_name)
+        detail_frame, detail_rows = self._click_transition(
+            hwnd, region, .889, .203, "quick_lookup_close_initial",
+            "journey_initial", "rescuer_detail", expected_name=expected_name)
         detail_page = parse_rescuer(detail_rows)
         if expected_name:
             self._verify_selected(detail_page, expected_name)
 
         # Full detail uses the top-left back arrow, not the modal close point.
-        self._click_fixed(hwnd, region, 0.043, 0.064, "quick_lookup_back_detail")
-        _, roster_rows = self._wait_page(hwnd, "rescuer_list", expected_name=expected_name)
+        self._record_step(scan_id, "returning_to_list", expected_name)
+        _, roster_rows = self._click_transition(
+            hwnd, region, .043, .064, "quick_lookup_back_detail",
+            "rescuer_detail", "rescuer_list", expected_name=expected_name)
         roster_page = parse_rescuer(roster_rows)
         if expected_name:
             self._verify_selected(roster_page, expected_name)
+        self._record_step(scan_id, "returned_to_list", expected_name)
         result["can_continue"] = True
         return result

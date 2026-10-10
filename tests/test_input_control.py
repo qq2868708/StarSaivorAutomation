@@ -97,6 +97,17 @@ class InputControlTests(unittest.TestCase):
             controller.send_escape()
         self.assertIs(controller.after_action.call_args.args[1], error)
 
+    def test_scroll_keeps_pointer_over_list_until_game_can_process_wheel(self):
+        controller = self.controller()
+        events = []
+        controller._send_move.side_effect = lambda *args: events.append("move")
+        controller.wait = lambda delay: events.append(("wait", delay))
+        controller._send_mouse_input.side_effect = lambda *args, **kwargs: events.append("restore")
+        with patch("src.controller.user32.SendInput",
+                   side_effect=lambda *args: (events.append("wheel"), 1)[1]):
+            controller.scroll_at_percent(.87, .54, clicks=-3)
+        self.assertEqual(events[:5], ["move", ("wait", .08), "wheel", ("wait", .15), "restore"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -23,7 +23,7 @@ from src.rule_engine import (
 class AdvantageTrainingTests(unittest.TestCase):
     def test_real_training_frame_detects_thumb_rows(self):
         frame_path = (Path(__file__).resolve().parents[1] /
-                      ".." / "verification" / "training-fix-20261006" /
+                      "verification" / "training-fix-20261006" /
                       "frames" / "strength.png")
         if not frame_path.is_file():
             self.skipTest("optional captured training frame is not included in the source checkout")

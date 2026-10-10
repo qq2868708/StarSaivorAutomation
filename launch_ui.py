@@ -16,16 +16,51 @@ from urllib.request import urlopen
 import uuid
 import webbrowser
 
+from src.environment import record_environment
+
+
+_SENSITIVE_ENV_MARKERS = (
+    "API_KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD",
+    "CREDENTIAL", "PRIVATE_KEY", "COOKIE", "AUTH",
+)
+
+
+def _safe_runtime_reference(root: Path, path: Path) -> str:
+    """Return a shareable path without exposing the local checkout directory."""
+    try:
+        return path.resolve().relative_to(root.resolve()).as_posix()
+    except (OSError, ValueError):
+        return f"runtime/{path.name}"
+
+
+def _redact_local_path(root: Path, value: object) -> str:
+    """Remove the checkout path from errors copied out of the launcher."""
+    text = str(value)
+    for local_path in {str(root), str(root.resolve())}:
+        text = text.replace(local_path, "<project>")
+    return text
+
+
+def _child_environment() -> dict[str, str]:
+    """Keep normal process settings while excluding common credential variables."""
+    environment = os.environ.copy()
+    for key in list(environment):
+        normalized = key.upper()
+        if any(marker in normalized for marker in _SENSITIVE_ENV_MARKERS):
+            environment.pop(key, None)
+    environment.update({"PYTHONUTF8": "1", "STARSAVIOR_UI_NO_BROWSER": "1"})
+    return environment
+
 
 @contextmanager
-def launch_lock(path: Path):
+def launch_lock(path: Path, timeout: float = 35):
     """Serialize double clicks while the HTTP server is still starting."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+b") as stream:
         if stream.tell() == 0:
             stream.write(b"\0")
             stream.flush()
-        deadline = time.monotonic() + 35
+        deadline = time.monotonic() + timeout
         while True:
             stream.seek(0)
             try:
@@ -61,6 +96,7 @@ def main() -> int:
         if not 1 <= port <= 65535:
             raise ValueError("STARSAVIOR_UI_PORT 必须在 1 至 65535 之间")
         url = f"http://127.0.0.1:{port}/"
+        record_environment(root, source="launcher", port=port)
         with launch_lock(root / "runtime" / f"ui-launcher-{port}.lock"):
             if not panel_ready(url):
                 with socket.socket() as probe:
@@ -70,7 +106,7 @@ def main() -> int:
                 log_id = uuid.uuid4().hex
                 stdout_path = root / "runtime" / f"ui-launcher-{log_id}.stdout.log"
                 stderr_path = root / "runtime" / f"ui-launcher-{log_id}.stderr.log"
-                environment = {**os.environ, "PYTHONUTF8": "1", "STARSAVIOR_UI_NO_BROWSER": "1"}
+                environment = _child_environment()
                 with stdout_path.open("wb") as stdout, stderr_path.open("wb") as stderr:
                     process = subprocess.Popen(
                         [sys.executable, "-u", str(root / "ui_app.py")], cwd=root,
@@ -79,16 +115,18 @@ def main() -> int:
                 deadline = time.monotonic() + 30
                 while not panel_ready(url):
                     if process.poll() is not None:
-                        raise RuntimeError(f"面板启动失败，查看日志：{stderr_path}")
+                        reference = _safe_runtime_reference(root, stderr_path)
+                        raise RuntimeError(f"面板启动失败，查看日志：{reference}")
                     if time.monotonic() >= deadline:
-                        raise RuntimeError(f"面板启动超时，查看日志：{stderr_path}")
+                        reference = _safe_runtime_reference(root, stderr_path)
+                        raise RuntimeError(f"面板启动超时，查看日志：{reference}")
                     time.sleep(.3)
         if not args.no_browser:
             webbrowser.open(url)
         print(f"StarSavior 面板已就绪：{url}")
         return 0
     except (OSError, RuntimeError, ValueError) as error:
-        print(f"启动面板失败：{error}", file=sys.stderr)
+        print(f"启动面板失败：{_redact_local_path(root, error)}", file=sys.stderr)
         return 1
 
 

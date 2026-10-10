@@ -275,6 +275,9 @@ class Controller:
         try:
             screen_x, screen_y = self._percent_to_screen(x_pct, y_pct)
             self._send_move(screen_x, screen_y)
+            # Unity evaluates pointer hover on its frame loop, not in SendInput.
+            # Let it observe the list hover before the wheel and before restoring.
+            self.wait(.08)
             # Re-check immediately before the wheel event.  The cursor move
             # can outlive a focus change caused by the user switching apps.
             self._check_input_target()
@@ -287,6 +290,7 @@ class Controller:
             inp.union.mi.dwExtraInfo = 0
             if user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(INPUT)) != 1:
                 raise InputTargetError("滚动输入失败，请核对游戏与脚本的运行权限")
+            self.wait(.15)
         except BaseException as exc:
             error = exc
             raise

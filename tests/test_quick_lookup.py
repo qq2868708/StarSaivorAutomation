@@ -106,6 +106,56 @@ class QuickLookupTests(unittest.TestCase):
                                      ("基本", .99, box(1180, 120)),
                                      ("旅程初始信息", .99, box(1320, 795))]), "rescuer_detail")
 
+    def test_weak_basic_tab_is_rejected_even_with_stat_labels(self):
+        rows = [
+            ("救援者", .749, box(205, 42, 78, 32)),
+            ("基本", .604, box(1203, 123, 46, 26)),
+            ("旅程初始信息", .832, box(1321, 796, 110, 23)),
+            ("攻击力", .699, box(1211, 309)),
+            ("生命力", .706, box(1211, 341)),
+            ("防御力", .745, box(1191, 367)),
+        ]
+        self.assertIsNone(_page_kind(rows))
+        strong = [(text, .99, bounds) for text, _, bounds in rows]
+        self.assertEqual(_page_kind(strong), "rescuer_detail")
+        self.assertIsNone(_page_kind(rows[:3]))
+        self.assertIsNone(_page_kind(rows[1:]))
+        self.assertIsNone(_page_kind([row for row in rows if row[0] != "旅程初始信息"]))
+        misplaced = rows[:3] + [(t, c, box(200, 320)) for t, c, _ in rows[3:]]
+        self.assertIsNone(_page_kind(misplaced))
+
+    def test_recovery_unknown_page_is_bounded_without_clicking(self):
+        from unittest.mock import Mock
+        with tempfile.TemporaryDirectory() as root:
+            scanner = QuickLookupScanner(root, sleep=lambda _: None, controller=Mock())
+            frame = np.zeros((900, 1600, 3), dtype=np.uint8)
+            scanner._read_frame = lambda hwnd: (frame, [])
+            with patch("src.quick_lookup.is_window_foreground", return_value=True):
+                with self.assertRaisesRegex(RuntimeError, "连续三次"):
+                    scanner._retry_rescuer_entry("scan", (0, 0, 1600, 900), 1, "甲", 1)
+            self.assertEqual(scanner.retry_count, 3)
+            scanner.controller.click_at_percent.assert_not_called()
+
+    def test_detail_confirmation_still_requires_two_frames_and_identity(self):
+        from unittest.mock import Mock
+        rows = [
+            ("救援者", .75, box(205, 42)),
+            ("基本", .99, box(1203, 123)),
+            ("旅程初始信息", .832, box(1321, 796)),
+            ("攻击力", .70, box(1211, 309)),
+            ("生命力", .71, box(1211, 341)),
+            ("防御力", .75, box(1191, 367)),
+            ("克拉丽莎", .79, box(159, 171)),
+        ]
+        with tempfile.TemporaryDirectory() as root:
+            scanner = QuickLookupScanner(root, sleep=lambda _: None, controller=Mock())
+            frame = np.zeros((900, 1600, 3), dtype=np.uint8)
+            scanner._read_frame = Mock(return_value=(frame, rows))
+            with patch("src.quick_lookup.is_window_foreground", return_value=True):
+                scanner._wait_page(1, "rescuer_detail", expected_name="克拉丽莎")
+            self.assertEqual(scanner._read_frame.call_count, 2)
+            scanner.controller.click_at_percent.assert_not_called()
+
     def test_failed_traversal_row_never_enters_character_mapping(self):
         match = build_match({"character": {"value": "亚瑟菈"}, "roster_details": [
             {"character": "错误角色", "verified": False,
@@ -145,13 +195,73 @@ class QuickLookupTests(unittest.TestCase):
                       (frame, detail_rows), (frame, list_rows)])
         scanner._wait_page = lambda hwnd, kind, **kwargs: next(pages)
         page = parse_rescuer(list_rows)
-        result = scanner._read_rescuer_detail("scan", (0, 0, 1600, 900), 1,
-                                              frame, page, 1, expected_name="亚瑟")
+        with patch("src.quick_lookup.is_window_foreground", return_value=True):
+            result = scanner._read_rescuer_detail("scan", (0, 0, 1600, 900), 1,
+                                                frame, page, 1, expected_name="亚瑟")
         self.assertTrue(result["can_continue"])
         self.assertEqual(clicked[0][2], "quick_lookup_close_initial")
         self.assertEqual(clicked[1][2], "quick_lookup_back_detail")
         self.assertEqual(clicked[0][:2], (.889, .203))
         self.assertEqual(clicked[1][:2], (.043, .064))
+
+    def test_initial_modal_requires_potential_label_as_well_as_identity_and_stats(self):
+        rows = [("救援者介绍", .833, box(780, 173)),
+                ("克拉丽莎", .85, box(323, 407, 85, 32)),
+                ("力量", .90, box(208, 481)),
+                ("体力", .90, box(375, 481)),
+                ("韧性", .90, box(207, 539))]
+        self.assertIsNone(_page_kind(rows))
+        confirmed = rows + [("潜质", .99, box(646, 172))]
+        self.assertEqual(_page_kind(confirmed), "journey_initial")
+        self.assertEqual(parse_journey_initial(confirmed, "克拉丽莎")["character"]["value"], "克拉丽莎")
+        self.assertIsNone(parse_journey_initial(confirmed, "其他角色")["character"])
+        self.assertIsNone(_page_kind(rows[:1] + rows[2:]))
+        self.assertIsNone(_page_kind(rows[:3]))
+        self.assertIsNone(_page_kind(rows[1:]))
+
+    def test_collect_close_and_return_flow_with_real_page_waits(self):
+        from unittest.mock import Mock
+        from src.quick_lookup_log import recent_events
+        list_rows = [("救援者", .95, box(205, 42)), ("克拉丽莎", .95, box(159, 171)),
+                     ("查看详情", .95, box(1370, 825))]
+        detail_rows = list_rows[:2] + [("基本", .95, box(1203, 123)),
+                                      ("旅程初始信息", .95, box(1321, 796))]
+        modal_rows = [("潜质", .99, box(646, 172)),
+                      ("救援者介绍", .99, box(780, 173)),
+                      ("克拉丽莎", .95, box(323, 407, 85, 32)),
+                      ("力量", .95, box(208, 481)), ("体力", .95, box(375, 481)),
+                      ("韧性", .95, box(207, 539))]
+        with tempfile.TemporaryDirectory() as root:
+            pages = {"list": list_rows, "detail": detail_rows, "modal": modal_rows}
+            current = {"page": "list"}
+            sources = []
+            def click(*args, source, **kwargs):
+                sources.append(source)
+                current["page"] = {
+                    "quick_lookup_view_details": "detail",
+                    "quick_lookup_journey_initial": "modal",
+                    "quick_lookup_close_initial": "detail",
+                    "quick_lookup_back_detail": "list",
+                }[source]
+            controller, capture, ocr = Mock(), Mock(), Mock()
+            controller.click_at_percent.side_effect = click
+            frame = np.zeros((900, 1600, 3), dtype=np.uint8)
+            capture.capture_game.return_value = frame
+            ocr.recognize_detailed.side_effect = lambda _: pages[current["page"]]
+            scanner = QuickLookupScanner(root, controller=controller, capture=capture,
+                                         ocr=ocr, sleep=lambda _: None)
+            with patch("src.quick_lookup.is_window_foreground", return_value=True):
+                result = scanner._read_rescuer_detail(
+                    "abc", (0, 0, 1600, 900), 1, frame,
+                    parse_rescuer(list_rows), 1, expected_name="克拉丽莎")
+            self.assertTrue(result["can_continue"])
+            self.assertEqual(current["page"], "list")
+            self.assertEqual(sources, ["quick_lookup_view_details", "quick_lookup_journey_initial",
+                                      "quick_lookup_close_initial", "quick_lookup_back_detail"])
+            self.assertEqual(ocr.recognize_detailed.call_count, 8)
+            self.assertEqual([event["event"] for event in recent_events(root, "rescuer")],
+                             ["initial_info_collected", "closing_initial",
+                              "returning_to_list", "returned_to_list"])
 
     def test_failed_row_is_retried_until_it_succeeds(self):
         first = [

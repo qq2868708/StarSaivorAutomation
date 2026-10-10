@@ -727,76 +727,153 @@ async function scanJourneyInfo() {
   }
 }
 
+const QUICK_LOOKUP_UI = {
+  rescuer: {
+    value: "rescuer",
+    status: "quickLookupRescuerStatus",
+    message: "quickLookupRescuerMessage",
+    result: "quickLookupRescuerResult",
+    gallery: "quickLookupRescuerGallery",
+    log: "quickLookupRescuerLog",
+  },
+  arcanum: {
+    value: "arcanum",
+    status: "quickLookupArcanumStatus",
+    message: "quickLookupArcanumMessage",
+    result: "quickLookupArcanumResult",
+    gallery: "quickLookupArcanumGallery",
+    log: "quickLookupArcanumLog",
+  },
+};
+
+function renderQuickLookupFamily(family, value, task, logs = []) {
+  const ui = QUICK_LOOKUP_UI[family];
+  const lines = [];
+  const items = [];
+  if (family === "rescuer") {
+    const details = value?.roster_details || [];
+    if (value) {
+      lines.push(`救援者：${value.character?.value || "未确认"} · 已读取角色详情 ${details.length} 条`);
+      if (details.length) lines.push(`角色列表：${details.map((item) => item.character || "未知").join("、")}`);
+      const traversal = value.roster_scan;
+      if (traversal) {
+        lines.push(`遍历：${traversal.complete ? "已完成" : "未完成"} · 已处理 ${traversal.attempted ?? 0} 条 · 重试 ${traversal.retries ?? 0} 次`);
+        if (typeof traversal.success_rate === "number") {
+          lines.push(`本轮通过率：${(traversal.success_rate * 100).toFixed(1)}%（成功 ${traversal.succeeded} / 总数 ${traversal.total}） · 90% 验收${traversal.accepted ? "通过" : "未通过"}`);
+        } else if (traversal.total != null) {
+          lines.push(`已识别列表 ${traversal.total} 条，完整分母尚未确认，不能判定通过率。`);
+        }
+        if (traversal.failed_characters?.length) lines.push(`失败角色：${traversal.failed_characters.join("、")}`);
+        if (traversal.stop_reason) lines.push(`停止原因：${traversal.stop_reason}`);
+      }
+      details.forEach((item) => items.push({
+        name: item.character || "未知角色",
+        image: item.journey_initial_portrait || item.identity_image,
+        verified: item.verified,
+      }));
+    }
+  } else if (value) {
+    const card = value.cards?.[0] || {};
+    lines.push(`阿尔克纳：${card.name?.value || card.name || "卡名待确认"}`);
+    lines.push(`识别卡片：${value.cards?.length || 0} 张`);
+    if (value.scan_summary) {
+      const summary = value.scan_summary;
+      lines.push(`${summary.mode === "library" ? "全库" : "本次"}：成功 ${summary.succeeded ?? 0} / ${summary.total ?? 0} · 失败 ${summary.failed ?? 0}`);
+      if (summary.stop_reason) lines.push(summary.stop_reason);
+    }
+    (value.cards || []).forEach((cardItem) => items.push({
+      name: cardItem.name?.value || cardItem.name || "未知阿尔克那",
+      image: cardItem.image,
+      verified: Boolean(cardItem.name),
+    }));
+  }
+  if (task?.log_path) lines.push(`日志：${task.log_path}`);
+  if (task) {
+    if (task.phase === "inventory") lines.push(`正在清点整个列表 · 已发现 ${task.discovered ?? 0} 条`);
+    if (task.phase === "arcanum_inventory") lines.push("正在逐页清点阿尔克纳");
+    lines.push(`阶段：${task.stage || task.state} · 已处理 ${task.attempted ?? 0} · 重试 ${task.retries ?? 0}`);
+    if (task.current) lines.push(`当前角色：${task.current}`);
+    if (task.last_retry_error) lines.push(`最近重试：${task.last_retry_error}`);
+    if (task.total != null) lines.push(`当前进度：成功 ${task.succeeded ?? 0} / 总数 ${task.total} · 失败 ${task.failed ?? 0}`);
+  }
+  const labels = {
+    waiting_foreground: "等待游戏前台",
+    scanning: "扫描进行中",
+    stopping: "正在停止",
+    stopped: "已停止",
+    completed: "扫描完成",
+    partial: "部分完成",
+    failed: "扫描失败",
+  };
+  const status = $(ui.status);
+  status.textContent = task ? (labels[task.state] || task.state)
+    : (value?.roster_scan?.accepted === false ? "验收未通过"
+      : value?.roster_scan?.complete === false ? "未完成" : value ? "已读取" : "尚未扫描");
+  status.classList.toggle("running", task?.state === "waiting_foreground" || task?.state === "scanning" || task?.state === "stopping");
+  status.classList.toggle("error", task?.state === "failed" || task?.state === "partial"
+    || (!task && (value?.roster_scan?.complete === false || value?.roster_scan?.accepted === false)));
+  $(ui.message).textContent = task?.error || task?.last_retry_error || (task ? labels[task.state] : value ? "已有保存结果。" : "等待开始扫描。");
+  const events = {started: "任务开始", scanning: "开始识别", read_retry: "读取重试",
+                  stopped: "已停止", stop_requested: "请求停止", failed: "失败", finished: "结束",
+                  initial_info_collected: "旅程初始信息采集完成", closing_initial: "关闭旅程弹窗",
+                  returning_to_list: "返回角色列表", returned_to_list: "已确认返回角色列表"};
+  Object.assign(events, {inventory_started: "清点完整列表", inventory_finished: "列表清点结束",
+    inventory_summary: "列表清点结果", entry_failed: "角色读取失败，继续下一条",
+    entry_failure_reason: "角色失败原因", navigation_retry: "核对页面后重试导航"});
+  Object.assign(events, {arcanum_grid_started: "扫描当前页卡片", arcanum_card_collected: "卡片读取完成",
+    arcanum_closing: "关闭卡片详情", arcanum_returned_to_grid: "已返回卡片列表",
+    arcanum_inventory_started: "开始全库清点", arcanum_inventory_finished: "全库清点完成",
+    arcanum_inventory_page: "清点分页", arcanum_scroll: "卡库滚动",
+    arcanum_library_summary: "全库扫描汇总"});
+  $(ui.log).textContent = [...logs].reverse().map((entry) => {
+    const markers = (entry.markers || []).map((marker) => `${marker.text}=${marker.confidence}`).join(" ");
+    const frames = Array.isArray(entry.traceback)
+      ? entry.traceback.map((frame) => `${frame.file}:${frame.line} ${frame.function}`).join(" > ") : "";
+    return [formatTime(entry.ts), events[entry.event] || entry.event, entry.task_id?.slice(0, 8),
+      entry.stage, entry.state, entry.character, entry.error,
+      entry.total != null ? `总数=${entry.total}` : "",
+      entry.discovered != null ? `已发现=${entry.discovered}` : "",
+      typeof entry.moved === "boolean" ? `${entry.direction === "down" ? "向下" : "向上"} ${entry.moved ? "已移动" : "未移动"}` : "",
+      typeof entry.success_rate === "number" ? `通过率=${(entry.success_rate * 100).toFixed(1)}%` : "",
+      markers, frames].filter(Boolean).join(" | ");
+  }).join("\n") || "暂无日志";
+  $(ui.result).textContent = lines.join("\n") || "尚未读取";
+  $(ui.gallery).innerHTML = items.map((item) => {
+    const source = item.image ? `/api/screenshot?path=${encodeURIComponent(item.image)}` : "";
+    const state = item.verified === false ? "未确认" : "已确认";
+    return `<div class="quick-lookup-card ${item.verified === false ? "failed" : ""}">${source ? `<img src="${source}" alt="${esc(item.name)}" loading="lazy">` : "<div class=\"screenshot-placeholder\">无图</div>"}<strong>${esc(item.name)}</strong><small>${state}</small></div>`;
+  }).join("");
+}
+
 function renderQuickLookup(data) {
   state.quickLookup = data || null;
+  const tasks = data?.tasks || {};
+  renderQuickLookupFamily("rescuer", data?.rescuer, tasks.rescuer, data?.logs?.rescuer);
+  renderQuickLookupFamily("arcanum", data?.arcanum, tasks.arcanum, data?.logs?.arcanum);
+  const active = Object.values(tasks).some((task) =>
+    ["waiting_foreground", "scanning", "stopping"].includes(task.state));
+  ["scanRescuerBtn", "scanCurrentRescuerBtn", "scanArcanumBtn"].forEach((id) => {
+    $(id).disabled = active || Boolean(state.runtime?.running);
+  });
+  $("stopRescuerBtn").disabled = !["waiting_foreground", "scanning"].includes(tasks.rescuer?.state);
+  $("stopArcanumBtn").disabled = !["waiting_foreground", "scanning"].includes(tasks.arcanum?.state);
   const match = data?.match;
-  const rescuer = data?.rescuer;
-  const arcanum = data?.arcanum;
-  const details = rescuer?.roster_details || [];
-  const lines = [];
-  if (rescuer) {
-    const character = rescuer.character?.value || "未确认";
-    lines.push(`救援者：${character} · 已读取可见角色详情 ${details.length} 条`);
-    if (details.length) lines.push(`角色列表：${details.map((item) => item.character || "未知").join("、")}`);
-    const traversal = rescuer.roster_scan;
-    if (traversal && !traversal.complete) {
-      const attempted = traversal.attempted ?? details.filter((item) => item.verified).length;
-      const retries = traversal.retries ?? 0;
-      lines.push(`遍历状态：未完成（已确认 ${attempted} 条；${traversal.stop_reason || "请重新扫描"}${retries ? `；累计重试 ${retries} 次` : ""}）`);
-    } else if (traversal) {
-      const retries = traversal.retries ?? 0;
-      lines.push(`遍历状态：已完成，共确认 ${traversal.attempted ?? details.filter((item) => item.verified).length} 条${retries ? `，累计重试 ${retries} 次` : ""}`);
-    }
-    if (traversal && traversal.mode === "incremental") {
-      lines.push(`增量合并：保留 ${traversal.retained ?? 0} 条，新增 ${traversal.new_verified ?? 0} 条，更新 ${traversal.replaced ?? 0} 条`);
-    }
-  }
-  if (arcanum) {
-    const card = arcanum.cards?.[0] || {};
-    const name = card.name?.value || card.name || "卡名待确认";
-    lines.push(`阿尔克那：${name}`);
-  }
+  const matchLines = [];
   if (match) {
-    lines.push(`对应关系：${match.status === "matched" ? "已匹配" : "部分匹配"}`);
-    lines.push(`旅程角色字段：${match.journey_end_mapping?.["actual_setup.character"]?.value || "未确认"}`);
+    matchLines.push(`状态：${match.status === "matched" ? "已匹配" : "部分匹配"}`);
+    matchLines.push(`旅程角色：${match.journey_end_mapping?.["actual_setup.character"]?.value || "未确认"}`);
     const cards = match.journey_end_mapping?.["actual_setup.support_cards"]?.value;
-    lines.push(`旅程支援卡字段：${cards?.map((item) => item.name).join("、") || "未确认"}`);
-    const mappings = match.character_mappings || [];
-    if (mappings.length) {
-      lines.push(`角色初始信息匹配：${mappings.map((item) => `${item.rescuer_character || "未知救援者"}→${item.journey_initial_character || "待确认"}`).join("、")}`);
+    matchLines.push(`旅程支援卡：${cards?.map((item) => item.name).join("、") || "未确认"}`);
+    if (match.character_mappings?.length) {
+      matchLines.push(`角色初始信息：${match.character_mappings.map((item) =>
+        `${item.rescuer_character || "未确认"} → ${item.journey_initial_character || "未确认"}`).join("、")}`);
     }
-    if ((match.uncertain || []).length) lines.push(`待人工确认：${match.uncertain.join("、")}`);
+    if (match.uncertain?.length) matchLines.push(`待人工确认：${match.uncertain.join("、")}`);
   }
-  const task = data?.task;
-  const foreground = $("quickLookupForeground");
-  if (foreground) {
-    const taskLabels = { waiting_foreground: "等待游戏前台", scanning: "扫描进行中", stopping: "正在停止", stopped: "已停止", completed: "扫描完成", partial: "扫描部分完成", failed: "扫描失败" };
-    const progress = task && task.state === "scanning" && task.attempted
-      ? ` · 已处理 ${task.attempted} 条${task.current ? `，当前：${esc(task.current)}` : ""}${task.retries ? `，已重试 ${task.retries} 次` : ""}`
-      : "";
-    foreground.textContent = task ? `${taskLabels[task.state] || task.state}${progress}` : "等待用户开始扫描";
-    foreground.classList.toggle("running", task?.state === "scanning" || task?.state === "stopping");
-    foreground.classList.toggle("error", task?.state === "failed" || task?.state === "partial");
-  }
-  $("quickLookupResult").textContent = lines.join("\n") || "尚未读取";
-  const gallery = $("quickLookupGallery");
-  if (gallery) {
-    const identityItems = details.map((item) => ({
-      name: item.character || "未知角色", image: item.journey_initial_portrait || item.identity_image,
-      verified: item.verified,
-    })).concat((arcanum?.cards || []).map((card) => ({
-      name: card.name?.value || card.name || "未知阿尔克那", image: card.image, verified: Boolean(card.name),
-    })));
-    gallery.innerHTML = identityItems.map((item) => {
-      const image = item.image;
-      const source = image ? `/api/screenshot?path=${encodeURIComponent(image)}` : "";
-      const status = item.verified === false ? "未确认" : "已确认";
-      return `<div class="quick-lookup-card ${item.verified === false ? "failed" : ""}">${source ? `<img src="${source}" alt="${esc(item.name)}" loading="lazy">` : "<div class=\"screenshot-placeholder\">无图</div>"}<strong>${esc(item.name)}</strong><small>${status}</small></div>`;
-    }).join("");
-  }
-  $("quickLookupBadge").textContent = match ? (match.status === "matched" ? "已匹配" : "部分匹配") : (rescuer || arcanum ? "已读取" : "未读取");
+  $("quickLookupMatchResult").textContent = matchLines.join("\n") || "尚未生成";
+  $("quickLookupBadge").textContent = match ? (match.status === "matched" ? "已匹配" : "部分匹配") : (data?.rescuer || data?.arcanum ? "已读取" : "未读取");
   $("quickLookupBadge").classList.toggle("ready", Boolean(match));
-  $("quickLookupSummary").textContent = match ? `最近匹配：${formatTime(match.observed_at)}` : "打开对应界面后分别读取，脚本会自动滑动右侧列表并遍历角色";
+  $("quickLookupSummary").textContent = match ? `最近匹配：${formatTime(match.observed_at)}` : "尚未生成";
 }
 
 async function loadQuickLookup() {
@@ -804,54 +881,31 @@ async function loadQuickLookup() {
   catch (error) { showToast(`读取快查状态失败：${error.message}`, true); }
 }
 
-async function quickLookupAction(path, label) {
+async function quickLookupAction(path, label, family) {
   const buttonIds = {
     "scan-rescuer": "scanRescuerBtn",
     "scan-current-rescuer": "scanCurrentRescuerBtn",
     "scan-arcanum": "scanArcanumBtn",
   };
-  const button = $(buttonIds[path] || "scanRescuerBtn");
+  const button = $(buttonIds[path]);
   button.disabled = true;
-  $("quickLookupMessage").textContent = `${label}；请保持 StarSavior 在前台…`;
+  $(QUICK_LOOKUP_UI[family].message).textContent = `${label}已开始；请把游戏切到前台。`;
   try {
     const data = await api(`/api/quick-lookup/${path}`, { method: "POST" });
     renderQuickLookup(data);
-    const taskId = data.task?.task_id;
-    if (taskId) {
-      $("quickLookupMessage").textContent = `${label}已开始；请把游戏切到前台，当前角色会持续重试直到成功。`;
-      await waitQuickLookupTask(taskId, label);
-    } else {
-      $("quickLookupMessage").textContent = `${label}完成，已增量保存名称与识别图片。`;
-      showToast(`${label}完成`);
-    }
   } catch (error) {
-    $("quickLookupMessage").textContent = error.message;
+    $(QUICK_LOOKUP_UI[family].message).textContent = error.message;
     showToast(`${label}失败：${error.message}`, true);
-  } finally { button.disabled = false; }
+    button.disabled = false;
+  }
 }
 
-async function waitQuickLookupTask(taskId, label) {
-  // A role read is deliberately unbounded: the scanner retries the same role
-  // until verified or until the user presses the explicit stop button.
-  while (true) {
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    const data = await api("/api/quick-lookup");
-    renderQuickLookup(data);
-    const task = data.task;
-    if (!task || task.task_id !== taskId) continue;
-    if (task.state === "completed" || task.state === "partial" || task.state === "stopped") {
-      const partial = task.state === "partial";
-      const stopped = task.state === "stopped";
-      $("quickLookupMessage").textContent = stopped ? `${label}已停止：${task.error || "已保留已确认条目。"}` : partial ? `${label}部分完成：${task.error || "已保留已确认条目，请核对后重试。"}` : `${label}完成，已增量保存名称与识别图片。`;
-      showToast(stopped ? `${label}已停止` : partial ? `${label}部分完成` : `${label}完成`, partial || stopped);
-      return;
-    }
-    if (task.state === "failed") {
-      const message = task.error || "扫描失败";
-      $("quickLookupMessage").textContent = message;
-      showToast(`${label}失败：${message}`, true);
-      return;
-    }
+async function stopQuickLookup(family) {
+  try {
+    renderQuickLookup(await api(`/api/quick-lookup/stop?kind=${encodeURIComponent(family)}`, { method: "POST" }));
+    $(QUICK_LOOKUP_UI[family].message).textContent = "已请求停止，当前输入检查完成后退出。";
+  } catch (error) {
+    $(QUICK_LOOKUP_UI[family].message).textContent = error.message;
   }
 }
 
@@ -861,26 +915,34 @@ async function matchQuickLookup() {
   try {
     const data = await api("/api/quick-lookup/match", { method: "POST" });
     renderQuickLookup(data);
-    $("quickLookupMessage").textContent = data.match?.status === "matched" ? "已生成角色、支援卡与旅程结束字段对应关系。" : "已生成部分对应关系，未确认字段已保留。";
-    showToast("对应关系已生成");
-  } catch (error) { $("quickLookupMessage").textContent = error.message; showToast(`生成对应关系失败：${error.message}`, true); }
-  finally { button.disabled = false; }
+    showToast(data.match?.status === "matched" ? "对应关系已生成" : "已生成部分对应关系");
+  } catch (error) {
+    $("quickLookupMatchResult").textContent = error.message;
+    showToast(`生成对应关系失败：${error.message}`, true);
+  } finally { button.disabled = false; }
 }
 
 $("journeyRecordSelect").addEventListener("change", renderJourneyRecord);
 $("refreshJourneyRecordsBtn").addEventListener("click", loadJourneyRecords);
 $("scanJourneyInfoBtn").addEventListener("click", scanJourneyInfo);
 $("saveJourneyResultBtn").addEventListener("click", saveJourneyResult);
-$("scanRescuerBtn").addEventListener("click", () => quickLookupAction("scan-rescuer", "救援者扫描"));
-$("scanCurrentRescuerBtn").addEventListener("click", () => quickLookupAction("scan-current-rescuer", "当前角色补充"));
-$("scanArcanumBtn").addEventListener("click", () => quickLookupAction("scan-arcanum", "阿尔克那扫描"));
-$("stopQuickLookupBtn").addEventListener("click", async () => {
-  try {
-    await api("/api/quick-lookup/stop", { method: "POST" });
-    $("quickLookupMessage").textContent = "已请求停止；脚本会在当前输入检查点安全退出。";
-  } catch (error) { $("quickLookupMessage").textContent = error.message; }
-});
+$("scanRescuerBtn").addEventListener("click", () => quickLookupAction("scan-rescuer", "救援者扫描", "rescuer"));
+$("scanCurrentRescuerBtn").addEventListener("click", () => quickLookupAction("scan-current-rescuer", "当前角色补充", "rescuer"));
+$("scanArcanumBtn").addEventListener("click", () => quickLookupAction("scan-arcanum", "阿尔克纳扫描", "arcanum"));
+$("stopRescuerBtn").addEventListener("click", () => stopQuickLookup("rescuer"));
+$("stopArcanumBtn").addEventListener("click", () => stopQuickLookup("arcanum"));
 $("matchQuickLookupBtn").addEventListener("click", matchQuickLookup);
+for (const id of ["rescuerLookupPanel", "arcanumLookupPanel"]) {
+  const panel = $(id);
+  try {
+    const saved = localStorage.getItem(`lookup-panel-${id}`);
+    if (saved !== null) panel.open = saved === "open";
+  } catch (_) { /* Folding still works if storage is unavailable. */ }
+  panel.addEventListener("toggle", () => {
+    try { localStorage.setItem(`lookup-panel-${id}`, panel.open ? "open" : "closed"); }
+    catch (_) { /* Storage preferences must not block scanning. */ }
+  });
+}
 
 document.querySelectorAll(".nav-item").forEach((button) => button.addEventListener("click", () => setTab(button.dataset.tab)));
 $("refreshBtn").addEventListener("click", async () => { await loadOverview(); if (state.activeTab === "events") await loadEvents(); showToast("数据已刷新"); });
@@ -900,3 +962,9 @@ loadJourneyTarget();
 loadJourneyRecords();
 loadQuickLookup();
 setInterval(loadRuntimeStatus, 2000);
+let quickLookupLoading = false;
+setInterval(async () => {
+  if (state.activeTab !== "quick-lookup" || quickLookupLoading) return;
+  quickLookupLoading = true;
+  try { await loadQuickLookup(); } finally { quickLookupLoading = false; }
+}, 1500);

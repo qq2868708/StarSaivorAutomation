@@ -191,20 +191,40 @@
 
       <section class="tab-page" id="tab-quick-lookup">
         <div class="page-toolbar">
-          <div><h2>数据快查</h2><p>只保存角色全名、阿尔克那名称和识别图片，扫描结果增量更新。</p></div>
+          <div><h2>数据快查</h2></div>
           <span class="image-badge" id="quickLookupBadge">未读取</span>
         </div>
-        <article class="panel quick-lookup-workbench">
-          <div class="panel-heading">
-            <div><h2>救援者与旅程初始信息</h2><p id="quickLookupSummary">扫描会自动滑动右侧角色列表，依次进入“查看详情 → 旅程初始信息”。</p></div>
-            <span class="runtime-pill" id="quickLookupForeground">等待用户切回游戏前台</span>
-          </div>
-          <div class="target-body">
-            <p class="quick-lookup-help">请先在游戏中打开救援者页面，再点击扫描。脚本会自动把右侧列表向下滑动，直到连续确认列表到底；浏览器失焦后任务会等待你把游戏切回前台，脚本不会抢焦点。单条角色读取失败时会停留在当前角色并持续重试，只有游戏失去前台才会停止输入。需要补录时，请先在游戏里选中角色，再点击“补充当前角色”。</p>
-            <div class="target-footer"><p id="quickLookupMessage">这是一次性资料维护入口。后续只有你主动点击扫描时才会重新读取。</p><div><button class="button secondary" id="scanRescuerBtn">全量扫描救援者与旅程初始信息</button><button class="button secondary" id="scanCurrentRescuerBtn">补充当前角色</button><button class="button secondary" id="scanArcanumBtn">全量读取当前阿尔克那</button><button class="button secondary" id="stopQuickLookupBtn">停止当前读取</button><button class="button primary" id="matchQuickLookupBtn">生成对应关系</button></div></div>
-            <pre id="quickLookupResult" class="quick-lookup-result">尚未读取</pre>
-            <div id="quickLookupGallery" class="quick-lookup-gallery"></div>
-          </div>
+        <div class="quick-lookup-grid">
+          <details class="quick-lookup-workbench quick-lookup-panel" id="rescuerLookupPanel" open>
+            <summary class="panel-heading">
+              <div><h2>救援者</h2></div>
+              <span class="runtime-pill" id="quickLookupRescuerStatus">尚未扫描</span>
+            </summary>
+            <div class="target-body">
+              <div class="target-footer"><p id="quickLookupRescuerMessage">等待开始救援者扫描。</p><div><button class="button secondary" id="scanRescuerBtn">扫描救援者</button><button class="button secondary" id="scanCurrentRescuerBtn">补充当前角色</button><button class="button secondary" id="stopRescuerBtn">停止救援者扫描</button></div></div>
+              <pre id="quickLookupRescuerResult" class="quick-lookup-result">尚未读取</pre>
+              <div id="quickLookupRescuerGallery" class="quick-lookup-gallery"></div>
+              <h3 class="quick-log-heading">救援者日志</h3>
+              <pre id="quickLookupRescuerLog" class="quick-lookup-log" aria-label="救援者日志">暂无日志</pre>
+            </div>
+          </details>
+          <details class="quick-lookup-workbench quick-lookup-panel" id="arcanumLookupPanel" open>
+            <summary class="panel-heading">
+              <div><h2>阿尔克纳</h2></div>
+              <span class="runtime-pill" id="quickLookupArcanumStatus">尚未扫描</span>
+            </summary>
+            <div class="target-body">
+              <div class="target-footer"><p id="quickLookupArcanumMessage">等待开始阿尔克纳扫描。</p><div><button class="button secondary" id="scanArcanumBtn">扫描阿尔克纳</button><button class="button secondary" id="stopArcanumBtn">停止阿尔克纳扫描</button></div></div>
+              <pre id="quickLookupArcanumResult" class="quick-lookup-result">尚未读取</pre>
+              <div id="quickLookupArcanumGallery" class="quick-lookup-gallery"></div>
+              <h3 class="quick-log-heading">阿尔克纳日志</h3>
+              <pre id="quickLookupArcanumLog" class="quick-lookup-log" aria-label="阿尔克纳日志">暂无日志</pre>
+            </div>
+          </details>
+        </div>
+        <article class="quick-lookup-match-panel">
+          <div class="panel-heading"><div><h2>对应关系</h2><p id="quickLookupSummary">尚未生成</p></div><button class="button primary" id="matchQuickLookupBtn">生成对应关系</button></div>
+          <pre id="quickLookupMatchResult" class="quick-lookup-result">尚未生成</pre>
         </article>
       </section>
 

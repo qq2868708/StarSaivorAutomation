@@ -1,4 +1,4 @@
-# Local runnable build; the original requirements.txt is retained for provenance.
+# Python 3.11/3.12 runtime; legacy dependencies are in requirements-legacy.txt.
 numpy==1.26.4
 opencv-python==4.10.0.84
 rapidocr-onnxruntime==1.4.4
