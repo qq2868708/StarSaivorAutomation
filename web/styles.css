@@ -27,6 +27,15 @@ button { cursor: pointer; }
 .runtime-controls { display: flex; flex-wrap: wrap; gap: 8px; }
 .button:disabled { cursor: wait; opacity: .55; }
 .quick-lookup-result { min-height: 92px; margin: 14px 0 0; padding: 12px 14px; overflow: auto; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: var(--surface-soft); font: 12px/1.65 Consolas, "Microsoft YaHei UI", monospace; white-space: pre-wrap; }
+.quick-lookup-gallery { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.quick-lookup-card { width: 118px; padding: 7px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+.quick-lookup-card.failed { opacity: .6; border-color: #efc6c6; }
+.quick-lookup-card img { display: block; width: 102px; height: 112px; object-fit: cover; border-radius: 6px; background: #f2f4f8; }
+.quick-lookup-card strong, .quick-lookup-card small { display: block; overflow: hidden; margin-top: 5px; text-overflow: ellipsis; white-space: nowrap; }
+.quick-lookup-card strong { color: var(--text); font-size: 11px; }
+.quick-lookup-card small { color: var(--muted-2); font-size: 9px; }
+.quick-lookup-workbench { min-height: 430px; }
+.quick-lookup-help { margin: 2px 0 16px; padding: 11px 13px; border-radius: 9px; color: #5f6d84; background: #f7f8fc; font-size: 11px; line-height: 1.7; }
 
 .sidebar {
   width: 230px;

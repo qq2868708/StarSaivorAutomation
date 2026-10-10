@@ -31,7 +31,7 @@ from src.runtime_control import RuntimeControl, process_alive
 from src.journey_target import JourneyTargetStore, JourneyTargetPending, load_catalog, precheck_target
 from src.journey_record import JourneyRecordStore
 from src.journey_info_scan import JourneyInfoScanner, JourneyInfoScanError
-from src.quick_lookup import QuickLookupScanner, QuickLookupStore, build_match
+from src.quick_lookup import QuickLookupInterrupted, QuickLookupScanner, QuickLookupStore, build_match
 
 
 ROOT = Path(__file__).resolve().parent
@@ -53,6 +53,8 @@ _automation_lock = threading.RLock()
 _automation_process: subprocess.Popen[str] | None = None
 _automation_log_handle = None
 _runtime_control = RuntimeControl(ROOT)
+_quick_lookup_tasks: dict[str, dict[str, Any]] = {}
+_quick_lookup_task_lock = threading.RLock()
 
 
 def _compact(value: Any, limit: int = 64) -> str:
@@ -393,46 +395,182 @@ def _quick_lookup_store():
     return QuickLookupStore(_runtime_control.root)
 
 
+def _quick_task_public(task: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not task:
+        return None
+    return {key: task.get(key) for key in
+            ("task_id", "kind", "state", "started_at", "finished_at", "error",
+             "attempted", "failed", "retries", "current")}
+
+
+def _quick_lookup_response(task: dict[str, Any] | None = None):
+    data = _quick_lookup_store().read()
+    if task is None:
+        with _quick_lookup_task_lock:
+            task = list(_quick_lookup_tasks.values())[-1] if _quick_lookup_tasks else None
+    data["task"] = _quick_task_public(task)
+    return data
+
+
+def _run_quick_lookup_task(task_id: str, kind: str, game_title: str):
+    with _quick_lookup_task_lock:
+        task = _quick_lookup_tasks.get(task_id)
+        if not task:
+            return
+        task["state"] = "waiting_foreground"
+    try:
+        def report_progress(progress: dict[str, Any]):
+            with _quick_lookup_task_lock:
+                current = _quick_lookup_tasks.get(task_id)
+                if current is not None:
+                    current["attempted"] = progress.get("attempted", 0)
+                    current["failed"] = progress.get("failed", 0)
+                    current["retries"] = progress.get("retries", 0)
+                    current["current"] = progress.get("current")
+
+        def persist_rescuer_entry(detail, page, scan_id):
+            _quick_lookup_store().merge_rescuer_detail(
+                detail, page=page, scan_id=scan_id, scan_complete=False)
+
+        scanner = QuickLookupScanner(
+            _runtime_control.root, window_title=game_title, progress=report_progress,
+            should_stop=lambda: (_quick_lookup_tasks.get(task_id, {}).get("state") == "stopping"),
+            on_rescuer_entry=(persist_rescuer_entry if kind == "rescuer" else None))
+        # The request originates in the browser, so the game commonly loses
+        # focus for a moment.  Wait without bringing it forward; once the user
+        # clicks the game, the scanner performs the verified full traversal.
+        scanner.wait_for_foreground(timeout=120.0)
+        with _quick_lookup_task_lock:
+            task["state"] = "scanning"
+        if kind == "rescuer_single":
+            scan = scanner.scan_selected_rescuer()
+            detail = (scan.get("roster_details") or [None])[0]
+            if not detail:
+                raise RuntimeError("当前角色详情为空，未写入补充记录")
+            _quick_lookup_store().merge_rescuer_detail(
+                detail, page=scan, scan_id=scan.get("scan_id"))
+        else:
+            scan_kind = "rescuer" if kind == "rescuer" else "arcanum"
+            scan = scanner.scan(scan_kind, traverse_rescuer=kind == "rescuer")
+            _quick_lookup_store().save_scan(scan_kind, scan)
+        with _quick_lookup_task_lock:
+            traversal = scan.get("roster_scan") or {}
+            task["attempted"] = traversal.get("attempted")
+            task["failed"] = traversal.get("failed")
+            task["retries"] = traversal.get("retries", 0)
+            task["current"] = None
+            single_success = kind == "rescuer_single"
+            task["state"] = ("completed" if single_success or traversal.get("complete", True)
+                              else "partial")
+            if task["state"] == "partial":
+                task["error"] = traversal.get("stop_reason") or "角色遍历未完成，已保留已验证条目"
+            task["finished_at"] = datetime.now().astimezone().isoformat()
+    except QuickLookupInterrupted as error:
+        with _quick_lookup_task_lock:
+            task["state"] = "stopped"
+            task["error"] = str(error)
+            task["finished_at"] = datetime.now().astimezone().isoformat()
+    except Exception as error:
+        with _quick_lookup_task_lock:
+            task["state"] = "failed"
+            task["error"] = f"{type(error).__name__}: {error}"
+            task["finished_at"] = datetime.now().astimezone().isoformat()
+
+
 @app.get("/api/quick-lookup")
 def quick_lookup_state():
     """Return the latest explicit rescuer/Arcana scans and their mapping."""
-    return _quick_lookup_store().read()
+    return _quick_lookup_response()
 
 
 @app.post("/api/quick-lookup/scan-rescuer")
 def scan_quick_rescuer():
-    """Read the visible rescuer page and OCR-confirmed right-side rows.
+    """Start a one-shot full rescuer/initial-info scan.
 
-    The user opens the page and keeps the game foreground.  The scanner may
-    click only the OCR-confirmed visible rows; it never scrolls, refocuses, or
-    changes a running journey.
+    The user opens the rescuer page and clicks once.  The background task waits
+    for the user to return the game to the foreground, then traverses the OCR
+    confirmed right-side rows and the ``查看详情 → 旅程初始信息`` path.  It
+    never refocuses or changes a running journey.
     """
     runtime = _automation_status()
     if runtime["running"]:
         raise HTTPException(409, "脚本仍在运行，请停止后再做数据快查")
     game = store.config.get("game", {}) if isinstance(store.config, dict) else {}
-    try:
-        scan = QuickLookupScanner(_runtime_control.root,
-                                  window_title=game.get("window_title", "StarSavior")).scan("rescuer")
-        return _quick_lookup_store().save_scan("rescuer", scan, scan.get("screenshot"))
-    except (ValueError, OSError, RuntimeError) as error:
-        raise HTTPException(409, str(error)) from error
+    with _quick_lookup_task_lock:
+        active = next((item for item in _quick_lookup_tasks.values()
+                       if item.get("state") in {"waiting_foreground", "scanning"}), None)
+        if active:
+            return _quick_lookup_response(active)
+        task_id = uuid.uuid4().hex
+        task = {"task_id": task_id, "kind": "rescuer", "state": "waiting_foreground",
+                "started_at": datetime.now().astimezone().isoformat(),
+                "finished_at": None, "error": None, "attempted": 0, "failed": 0,
+                "retries": 0, "current": None}
+        _quick_lookup_tasks[task_id] = task
+    threading.Thread(target=_run_quick_lookup_task,
+                     args=(task_id, "rescuer", game.get("window_title", "StarSavior")),
+                     daemon=True, name="quick-lookup-rescuer").start()
+    return _quick_lookup_response(task)
 
 
 @app.post("/api/quick-lookup/scan-arcanum")
 def scan_quick_arcanum():
-    """Read the currently visible Arcana/support-card page without input."""
+    """Start a one-shot scan of the currently visible Arcana/support-card page."""
     runtime = _automation_status()
     if runtime["running"]:
         raise HTTPException(409, "脚本仍在运行，请停止后再做数据快查")
     game = store.config.get("game", {}) if isinstance(store.config, dict) else {}
-    try:
-        scan = QuickLookupScanner(_runtime_control.root,
-                                  window_title=game.get("window_title", "StarSavior")).scan("arcanum",
-                                                                                          traverse_rescuer=False)
-        return _quick_lookup_store().save_scan("arcanum", scan, scan.get("screenshot"))
-    except (ValueError, OSError, RuntimeError) as error:
-        raise HTTPException(409, str(error)) from error
+    with _quick_lookup_task_lock:
+        active = next((item for item in _quick_lookup_tasks.values()
+                       if item.get("state") in {"waiting_foreground", "scanning"}), None)
+        if active:
+            return _quick_lookup_response(active)
+        task_id = uuid.uuid4().hex
+        task = {"task_id": task_id, "kind": "arcanum", "state": "waiting_foreground",
+                "started_at": datetime.now().astimezone().isoformat(),
+                "finished_at": None, "error": None, "attempted": 0, "failed": 0,
+                "retries": 0, "current": None}
+        _quick_lookup_tasks[task_id] = task
+    threading.Thread(target=_run_quick_lookup_task,
+                     args=(task_id, "arcanum", game.get("window_title", "StarSavior")),
+                     daemon=True, name="quick-lookup-arcanum").start()
+    return _quick_lookup_response(task)
+
+
+@app.post("/api/quick-lookup/scan-current-rescuer")
+def scan_current_rescuer():
+    """Force-read only the currently selected rescuer until it succeeds."""
+    runtime = _automation_status()
+    if runtime["running"]:
+        raise HTTPException(409, "脚本仍在运行，请停止后再做数据快查")
+    game = store.config.get("game", {}) if isinstance(store.config, dict) else {}
+    with _quick_lookup_task_lock:
+        active = next((item for item in _quick_lookup_tasks.values()
+                       if item.get("state") in {"waiting_foreground", "scanning"}), None)
+        if active:
+            return _quick_lookup_response(active)
+        task_id = uuid.uuid4().hex
+        task = {"task_id": task_id, "kind": "rescuer_single",
+                "state": "waiting_foreground",
+                "started_at": datetime.now().astimezone().isoformat(),
+                "finished_at": None, "error": None, "attempted": 0,
+                "failed": 0, "retries": 0, "current": None}
+        _quick_lookup_tasks[task_id] = task
+    threading.Thread(target=_run_quick_lookup_task,
+                     args=(task_id, "rescuer_single", game.get("window_title", "StarSavior")),
+                     daemon=True, name="quick-lookup-current-rescuer").start()
+    return _quick_lookup_response(task)
+
+
+@app.post("/api/quick-lookup/stop")
+def stop_quick_lookup():
+    with _quick_lookup_task_lock:
+        task = next((item for item in reversed(list(_quick_lookup_tasks.values()))
+                     if item.get("state") in {"waiting_foreground", "scanning"}), None)
+        if not task:
+            raise HTTPException(409, "当前没有正在进行的数据读取")
+        task["state"] = "stopping"
+        return _quick_lookup_response(task)
 
 
 @app.post("/api/quick-lookup/match")
@@ -440,11 +578,9 @@ def match_quick_lookup():
     state = _quick_lookup_store().read()
     if not state.get("rescuer") and not state.get("arcanum"):
         raise HTTPException(409, "请先读取救援者或阿尔克那界面")
-    match = build_match(state.get("rescuer"), state.get("arcanum"), screenshots={
-        key: (state.get(key) or {}).get("screenshot") for key in ("rescuer", "arcanum")
-    })
+    match = build_match(state.get("rescuer"), state.get("arcanum"))
     _quick_lookup_store().save_match(match)
-    return {**state, "match": match}
+    return {**state, "match": match, "task": None}
 
 
 @app.put("/api/journey-target")

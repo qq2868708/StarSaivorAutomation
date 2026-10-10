@@ -22,6 +22,7 @@ INPUT_KEYBOARD = 1
 MOUSEEVENTF_MOVE = 0x0001
 MOUSEEVENTF_LEFTDOWN = 0x0002
 MOUSEEVENTF_LEFTUP = 0x0004
+MOUSEEVENTF_WHEEL = 0x0800
 MOUSEEVENTF_ABSOLUTE = 0x8000
 KEYEVENTF_KEYUP = 0x0002
 SM_CXSCREEN = 0
@@ -259,6 +260,46 @@ class Controller:
         finally:
             cleanup = [lambda: self._send_key(vk, key_up=True)] if pressed else []
             self._complete_input(action, error, cleanup)
+        self.wait(0.1)
+
+    def scroll_at_percent(self, x_pct, y_pct, clicks=-5, source="script"):
+        """Scroll a confirmed in-game list without changing window focus."""
+        self._check_input_target()
+        saved_pos = POINT()
+        user32.GetCursorPos(ctypes.byref(saved_pos))
+        action = {"kind": "scroll", "x": float(x_pct), "y": float(y_pct),
+                  "clicks": int(clicks), "source": source}
+        if self.before_action:
+            self.before_action(action)
+        error = None
+        try:
+            screen_x, screen_y = self._percent_to_screen(x_pct, y_pct)
+            self._send_move(screen_x, screen_y)
+            # Re-check immediately before the wheel event.  The cursor move
+            # can outlive a focus change caused by the user switching apps.
+            self._check_input_target()
+            inp = INPUT()
+            inp.type = INPUT_MOUSE
+            inp.union.mi = MOUSEINPUT()
+            inp.union.mi.mouseData = int(clicks) * 120
+            inp.union.mi.dwFlags = MOUSEEVENTF_WHEEL
+            inp.union.mi.time = 0
+            inp.union.mi.dwExtraInfo = 0
+            if user32.SendInput(1, ctypes.byref(inp), ctypes.sizeof(INPUT)) != 1:
+                raise InputTargetError("滚动输入失败，请核对游戏与脚本的运行权限")
+        except BaseException as exc:
+            error = exc
+            raise
+        finally:
+            try:
+                self._send_mouse_input(saved_pos.x, saved_pos.y,
+                                       MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
+                                       check_target=False)
+            except BaseException as exc:
+                if error is None:
+                    error = exc
+            if self.after_action:
+                self.after_action(action, error)
         self.wait(0.1)
 
     def _complete_input(self, action, error, cleanup):
