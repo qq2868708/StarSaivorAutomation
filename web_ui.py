@@ -51,7 +51,8 @@ TRAINING_TARGETS = {
     "集中训练": (0.86, 0.58),
     "保护训练": (0.86, 0.68),
 }
-ACTION_TYPES = {"decision", "train", "rest", "event", "arcanum", "card_select", "shop"}
+ACTION_TYPES = {"decision", "train", "rest", "event", "arcanum", "card_select", "shop",
+                "commission", "battle_choice"}
 
 _automation_lock = threading.RLock()
 _automation_process: subprocess.Popen[str] | None = None
@@ -186,20 +187,38 @@ class DataStore:
                 if action.get("type") not in ACTION_TYPES:
                     continue
                 screenshot = self.resolve_screenshot(action.get("screenshot"))
+                evidence = action.get("evidence") or {}
+                frames = []
+                for frame in evidence.get("frames", []):
+                    image = self.resolve_screenshot(frame.get("screenshot"))
+                    frames.append({**frame, "available": image is not None,
+                                   "screenshot_url": f"/api/screenshot?path={quote(str(frame.get('screenshot')), safe='')}"
+                                   if image else None})
+                snapshot = next((item for item in data.get("strategy_history", [])
+                                 if item.get("strategy_hash") == action.get("strategy_hash")),
+                                data.get("strategy", {}))
                 rows.append({
+                    "action_id": action.get("action_id"),
+                    "timestamp": action.get("ts") or action.get("timestamp") or "",
                     "run_id": run_id,
                     "type": action.get("type", "action"),
-                    "time": str(action.get("ts") or action.get("timestamp") or "")[-8:],
+                    "time": str(action.get("ts") or action.get("timestamp") or "").split("T")[-1][:8],
                     "decision": action.get("attribute") or action.get("action") or
-                                action.get("event_name") or action.get("name") or "—",
+                                action.get("event_name") or action.get("name") or action.get("tier") or "—",
                     "target": _target_text(action),
                     "screenshot": action.get("screenshot"),
                     "screenshot_url": f"/api/screenshot?path={quote(str(action.get('screenshot')), safe='')}"
                                       if screenshot else None,
                     "has_screenshot": screenshot is not None,
+                    "evidence": {**evidence, "frames": frames,
+                                 "available_frames": sum(frame["available"] for frame in frames),
+                                 "complete": bool(evidence.get("complete") and frames and
+                                                  all(frame["available"] for frame in frames))},
+                    "strategy_snapshot": snapshot,
                     "details": action,
                 })
-        return rows[-limit:][::-1]
+        rows.sort(key=lambda row: row["timestamp"], reverse=True)
+        return rows[:limit]
 
     def event_rows(self, query: str = "") -> list[dict[str, Any]]:
         query = query.strip().lower()

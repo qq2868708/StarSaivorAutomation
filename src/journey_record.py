@@ -243,6 +243,12 @@ class JourneyRecordStore:
             "exploration" if record["exploration"].get("included") else
             payload.get("execution_mode", "normal"))
         record["segments"] = [item for item in record["segments"] if item["run_id"] != payload["run_id"]] + [segment]
+        record["fallbacks"] = [
+            item for item in record.get("fallbacks", []) if item.get("run_id") != payload["run_id"]
+        ] + [{**copy.deepcopy(item), "run_id": payload["run_id"], "log_path": log_path}
+             for item in payload.get("fallbacks", [])]
+        record["outcome"]["fallback_count"] = len(record["fallbacks"])
+        record["outcome"]["rules_fully_followed"] = not record["fallbacks"]
         for target in payload["target_history"]:
             if not any(item.get("revision") == target.get("revision") for item in record["target_history"]):
                 record["target_history"].append(copy.deepcopy(target))

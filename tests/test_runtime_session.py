@@ -10,6 +10,7 @@ import numpy as np
 
 from src.handlers import EventDecisionPending, HandlerChain, JourneyEndException
 from src.runtime_control import RuntimeInterrupt
+from src.controller import InputTargetError, SceneTransitionError
 from src.trainer import Trainer
 
 
@@ -105,6 +106,60 @@ def make_trainer(root, action=None):
 
 
 class RuntimeSessionTests(unittest.TestCase):
+    def test_transient_recovery_is_bounded_and_discards_cached_inputs(self):
+        with tempfile.TemporaryDirectory() as root:
+            trainer = make_trainer(root)
+            trainer.config = {"safety": {"auto_recovery_attempts": 2}}
+            trainer._handler_ctx.pending_action = "training"
+            trainer._handler_ctx.pending_screenshot = trainer.capture.frame
+            trainer._round_deadline = 1
+            for _ in range(2):
+                self.assertTrue(trainer._try_auto_recovery(SceneTransitionError("transition")))
+            self.assertFalse(trainer._try_auto_recovery(SceneTransitionError("transition")))
+            self.assertIsNone(trainer._handler_ctx.pending_screenshot)
+            self.assertEqual(trainer._handler_ctx.pending_action, "")
+            self.assertTrue(trainer._recovering)
+            self.assertEqual(trainer._round_deadline, 0)
+            self.assertEqual(trainer.controller.sent, [])
+            self.assertEqual(trainer.logger.log_fallback.call_count, 2)
+
+    def test_recovery_never_overrides_manual_pause_or_unverified_input(self):
+        with tempfile.TemporaryDirectory() as root:
+            trainer = make_trainer(root)
+            trainer.config = {"safety": {"auto_recovery_attempts": 2}}
+            for error in (InputTargetError("payment"), EventDecisionPending("unknown"),
+                          RuntimeInterrupt("checkpoint_error"), RuntimeInterrupt("pause")):
+                self.assertFalse(trainer._try_auto_recovery(error))
+            trainer._paused = True
+            self.assertFalse(trainer._try_auto_recovery(SceneTransitionError("transition")))
+            trainer._paused = False
+            trainer._stop_requested = True
+            self.assertFalse(trainer._try_auto_recovery(RuntimeInterrupt("round_timeout")))
+
+    def test_transient_full_loop_recovers_and_reaches_journey_end(self):
+        with tempfile.TemporaryDirectory() as root:
+            attempts = []
+            def action(ctx):
+                attempts.append(1)
+                if len(attempts) == 1:
+                    raise SceneTransitionError("transition")
+                raise JourneyEndException("end")
+            trainer = make_trainer(root, action)
+            trainer.max_rounds = 0
+            trainer.config = {"safety": {"auto_recovery_attempts": 2}}
+            with patch("src.trainer.preload_profiles"):
+                trainer.run(auto_start=True)
+            self.assertEqual(len(attempts), 2)
+            self.assertEqual(trainer.runtime.read_status()["state"], "journey_end")
+            self.assertEqual(trainer.controller.sent, [])
+
+    def test_status_reports_active_input_refocus_policy(self):
+        with tempfile.TemporaryDirectory() as root:
+            trainer = make_trainer(root)
+            trainer.controller.auto_refocus = True
+            trainer._runtime_status("running")
+            self.assertTrue(trainer.runtime.read_status()["auto_refocus"])
+
     def test_click_is_checkpointed_before_input_and_after_input(self):
         with tempfile.TemporaryDirectory() as root:
             trainer = make_trainer(root)

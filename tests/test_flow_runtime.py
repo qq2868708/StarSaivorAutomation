@@ -14,6 +14,7 @@ from src.handlers import (
     InventoryHandler,
     AppraisalHandler,
     JourneyEndException,
+    JourneyTransitionHandler,
 )
 
 class FlowRuntimeTests(unittest.TestCase):
@@ -53,6 +54,7 @@ class FlowRuntimeTests(unittest.TestCase):
         detector = ScreenDetector(Mock())
         detector.read_region_text = Mock(side_effect=[
             '虚空评鉴战',
+            '',
             '是否要进行评鉴战？建议战斗 跳过战斗 开始委托',
         ])
         self.assertFalse(detector.is_appraisal_screen(np.zeros((900, 1600, 3), np.uint8)))
@@ -63,6 +65,17 @@ class FlowRuntimeTests(unittest.TestCase):
                      '总获得潜质点数 100', '距目标 6 参加评鉴战'):
             self.assertFalse(handler._is_journey_end_text(text))
         self.assertTrue(handler._is_journey_end_text('旅程结束'))
+
+    def test_journey_goal_achieved_banner_advances_before_terminal_result(self):
+        frame = SimpleNamespace(
+            screenshot=np.zeros((900, 1600, 3), np.uint8),
+            recognize_full=Mock(return_value=[
+                ("旅程目标达成", .99, None), ("星光引导者", .99, None),
+                ("点击以继续", .99, None)]))
+        self.assertTrue(JourneyTransitionHandler().can_handle(frame, Mock()))
+        end = JourneyEndHandler.__new__(JourneyEndHandler)
+        self.assertFalse(end._is_journey_end_text("旅程目标达成 星光引导者 点击以继续"))
+        self.assertTrue(end._is_journey_end_text("继承旅程 是时候为旅程画下句号"))
 
     def test_final_journey_end_pauses_for_manual_takeover(self):
         handler = JourneyEndHandler({'journey_end': {'auto_learn_skills': True,

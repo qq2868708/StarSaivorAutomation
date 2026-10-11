@@ -25,7 +25,17 @@ from .runtime_control import RuntimeControl
 
 _SCREENSHOT_ACTION_TYPES = {
     "decision", "train", "rest", "event", "arcanum", "card_select", "shop",
+    "commission", "battle_choice", "fallback",
 }
+
+def _json_snapshot(value):
+    def encode(item):
+        if isinstance(item, Enum):
+            return item.value
+        if is_dataclass(item):
+            return asdict(item)
+        raise TypeError(f"Unsupported decision value: {type(item).__name__}")
+    return json.loads(json.dumps(value, default=encode, ensure_ascii=False))
 
 
 class RunLogger:
@@ -51,6 +61,9 @@ class RunLogger:
         self._final_observation = None
         self._exploration_attempts = []
         self._target_revision = None
+        self._evidence_groups = []
+        self._decision_evidence = None
+        self._active_decision_id = None
 
         # 摘要统计 (运行中累积)
         self._train_count = 0
@@ -129,6 +142,7 @@ class RunLogger:
 
     def log_input(self, action):
         self._inputs.append({**copy.deepcopy(action), "target_revision": self._target_revision,
+                             "decision_id": self._active_decision_id,
                              "observation_id": self._observations[-1]["id"] if self._observations else None})
 
     def log_target_progress(self, phase, choice):
@@ -147,6 +161,56 @@ class RunLogger:
         """
         self._current_screenshot = screenshot
         self._current_screenshot_path = None
+
+    def begin_decision(self, kind, candidates):
+        self._active_decision_id = None
+        self._decision_evidence = {
+            "id": uuid.uuid4().hex, "kind": kind, "started_at": now_iso(),
+            "expected_candidates": list(candidates), "frames": [],
+            "target_revision": self._target_revision,
+            "strategy_hash": self._strategy.get("strategy_hash"),
+        }
+        self._evidence_groups.append(self._decision_evidence)
+
+    def clear_decision(self):
+        self._decision_evidence = None
+        self._active_decision_id = None
+
+    def record_decision_frame(self, candidate, label, screenshot, values, *, role="candidate"):
+        """Evidence must be written successfully before a decision can use it."""
+        if self._decision_evidence is None:
+            raise RuntimeError("尚未开始决策证据采集")
+        if screenshot is None or not getattr(screenshot, "size", 0):
+            raise RuntimeError("决策证据截图为空，停止执行")
+        import cv2
+        self._screenshot_index += 1
+        filename = f"{self._run_id}_{self._screenshot_index:04d}_evidence.png"
+        folder = self._root / "logs" / "screenshots"
+        folder.mkdir(parents=True, exist_ok=True)
+        path = folder / filename
+        if not cv2.imwrite(str(path), screenshot):
+            raise RuntimeError("决策证据截图保存失败，停止执行")
+        evidence = {
+            "id": uuid.uuid4().hex, "candidate": candidate, "label": label,
+            "role": role, "observed_at": now_iso(),
+            "screenshot": (Path("logs") / "screenshots" / filename).as_posix(),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "image_size": [int(screenshot.shape[1]), int(screenshot.shape[0])],
+            "values": _json_snapshot(values),
+        }
+        self._decision_evidence["frames"].append(evidence)
+        self.save("running", announce=False, close_turn=False)
+        return evidence["id"]
+
+    def decision_evidence(self):
+        if self._decision_evidence is None:
+            return None
+        evidence = copy.deepcopy(self._decision_evidence)
+        covered = {frame["candidate"] for frame in evidence["frames"] if frame["role"] == "candidate"}
+        evidence["missing_candidates"] = [
+            candidate for candidate in evidence["expected_candidates"] if candidate not in covered]
+        evidence["complete"] = not evidence["missing_candidates"]
+        return evidence
 
     def _save_current_screenshot(self, action_type: str) -> str | None:
         if self._current_screenshot is None:
@@ -178,6 +242,10 @@ class RunLogger:
     def start_turn(self, round_num: int, turn_num: Optional[int],
                    stamina: float, mood: str, money: int):
         """开始新回合, 记录初始游戏状态"""
+        # Commission/story actions may already occupy an implicit turn.
+        # Starting training must not discard those historical decisions.
+        if self._current_turn is not None:
+            self.end_turn()
         self._current_turn = {
             "round": round_num,
             "turn": turn_num,
@@ -209,7 +277,7 @@ class RunLogger:
             "turn_progress": f"{current_turn}/{turn_limit}",
         })
 
-    def log_decision_rule_engine(self, result, context, scan_state):
+    def log_decision_rule_engine(self, result, context, scan_state, *, base_result=None, overrides=None):
         """记录规则引擎决策过程"""
         self._append_action("decision", {
             "mode": "rule_engine",
@@ -218,10 +286,14 @@ class RunLogger:
             "action": result.action.value,
             "target_row": result.target_row_index,
             "builtin_fallback": result.used_builtin_default,
+            "decision_context": _json_snapshot(context),
+            "base_decision": _json_snapshot(base_result or result),
+            "overrides": _json_snapshot(overrides or {}),
             "metrics": {
                 "icon_counts": list(scan_state.icon_counts),
                 "fail_rates": list(scan_state.fail_rates),
                 "gain_values": list(scan_state.gain_values),
+                "flash_training": list(scan_state.is_flash),
                 "advantage_training": list(getattr(scan_state, "is_advantage", [False] * 5)),
                 "advantage_multiplier": round(float(getattr(context, "advantage_multiplier", 1.35)), 3),
                 "strength_stat": scan_state.strength_stat,
@@ -234,7 +306,7 @@ class RunLogger:
             },
         })
 
-    def log_decision_traditional(self, options, state, chosen):
+    def log_decision_traditional(self, options, state, chosen, *, action=None):
         """记录传统权重模式决策过程"""
         opts = []
         for opt in options:
@@ -248,6 +320,8 @@ class RunLogger:
             "priority_attr_id": getattr(state, '_priority_id', None),
             "options": opts,
             "chosen": chosen.attr_name if chosen else None,
+            "action": action,
+            "decision_context": _json_snapshot(vars(state)),
             "thresholds": {
                 "failure": getattr(state, '_fail_threshold', None),
                 "min_gain": getattr(state, '_min_gain', None),
@@ -360,20 +434,42 @@ class RunLogger:
         })
         return elapsed
 
-    def log_commission(self, tier: str, my_rank: int, recommended: int):
+    def log_commission(self, tier, my_rank, recommended, *, candidates=None, mode=None,
+                       policy=None, reason=None, phase="selection"):
         """记录讨伐委托执行"""
         self._append_action("commission", {
             "tier": tier,
             "my_rank": my_rank,
             "recommended": recommended,
+            "candidates": copy.deepcopy(candidates or []),
+            "battle_mode": mode, "policy": copy.deepcopy(policy or {}),
+            "reason": reason, "phase": phase,
         })
 
-    def log_card_select(self, card_index: int, reason: str, texts: list[str]):
+    def log_battle_choice(self, mode, recommendation, position, *, reason, commission=False):
+        self._append_action("battle_choice", {
+            "action": mode, "recommendation": recommendation, "reason": reason,
+            "commission": commission, "target_x": position[0], "target_y": position[1],
+        })
+
+    def log_fallback(self, scope, reason, rule, chosen, *, candidates=None):
+        """Keep rule deviations distinct from successful rule-based choices."""
+        self._append_action("fallback", {
+            "scope": scope, "reason": reason, "rule": copy.deepcopy(rule),
+            "chosen": copy.deepcopy(chosen), "candidates": copy.deepcopy(candidates or []),
+            "phase": "planned", "evidence": self.decision_evidence(),
+        })
+
+    def log_card_select(self, card_index: int, reason: str, texts: list[str], *,
+                        candidates=None, policy=None, phase="planned", position=None):
         """记录卡片选择"""
         self._append_action("card_select", {
             "card_index": card_index,
             "reason": reason,
             "card_texts": texts,
+            "candidates": copy.deepcopy(candidates or []),
+            "policy": copy.deepcopy(policy or {}), "phase": phase,
+            **({"target_x": position[0], "target_y": position[1]} if position else {}),
         })
 
     # ===================== 持久化 =====================
@@ -386,6 +482,8 @@ class RunLogger:
 
         elapsed = time.time() - self._start_time
         total_actions = sum(len(t["actions"]) for t in turns)
+        fallbacks = [copy.deepcopy(action) for turn in turns for action in turn["actions"]
+                     if action.get("type") == "fallback"]
 
         # 耗时分析
         timing = self._build_timing_summary()
@@ -407,6 +505,7 @@ class RunLogger:
                 "shop_items_bought": self._shop_items_bought,
                 "events_encountered": self._events_encountered,
                 "arcanum_clicks": self._arcanum_clicks,
+                "fallback_count": len(fallbacks),
             },
             "timing": timing,
             "turns": turns,
@@ -417,6 +516,8 @@ class RunLogger:
             "setup_observations": self._setup_observations,
             "observations": self._observations,
             "inputs": self._inputs,
+            "fallbacks": fallbacks,
+            "decision_evidence": self._evidence_groups,
             "final_observation": self._final_observation,
             # Explicitly classify the completed run so replay/UI consumers do
             # not need to infer it from the presence of an attempts array.
@@ -503,6 +604,21 @@ class RunLogger:
         data["target_revision"] = self._target_revision
         data["strategy_hash"] = self._strategy.get("strategy_hash")
         data["observation_id"] = self._observations[-1]["id"] if self._observations else None
+        if action_type in {"decision", "commission", "battle_choice", "card_select", "fallback"}:
+            evidence = self.decision_evidence()
+            if evidence is not None:
+                if (action_type in {"decision", "commission", "card_select"} and data.get("phase") != "recovery"
+                        and not evidence["complete"]):
+                    raise RuntimeError("候选证据不完整，停止执行决策")
+                data["evidence"] = evidence
+                data["evidence_id"] = evidence["id"]
+            self._active_decision_id = data["action_id"]
+        elif self._active_decision_id and action_type in {"train", "rest"}:
+            data["decision_id"] = self._active_decision_id
+            evidence = self.decision_evidence()
+            if evidence is not None:
+                data["evidence"] = evidence
+                data["evidence_id"] = evidence["id"]
         if action_type in _SCREENSHOT_ACTION_TYPES:
             screenshot_path = self._save_current_screenshot(action_type)
             if screenshot_path:

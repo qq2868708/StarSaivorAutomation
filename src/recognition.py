@@ -592,6 +592,11 @@ class ScreenDetector:
         has_commission = "讨伐" in title_text or "委托" in title_text
         if has_commission:
             return False
+        # The journey goal remains visible on commission pages; it is not the
+        # title of the selected preparation page.
+        panel_title = self.read_region_text(screenshot, 0.50, 0.25, 0.27, 0.12)
+        if "讨伐委托" in panel_title:
+            return False
 
         # 点击“接受”后会出现确认层。它仍保留准备页背景和“建议综合等级”，
         # 但已经应由 SkipHandler 处理“跳过战斗”，不能继续被当作准备页等待。

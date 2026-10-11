@@ -141,6 +141,15 @@ h3 { font-size: 13px; }
 .screenshot-placeholder span { color: var(--muted-2); font-size: 11px; }
 .placeholder-icon { display: grid; place-items: center; width: 45px; height: 45px; border-radius: 14px; color: #7064dd; background: var(--primary-soft); font-size: 23px; }
 .screenshot-path { min-height: 19px; padding: 11px 20px 15px; overflow: hidden; color: var(--muted-2); font-family: Consolas, monospace; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.evidence-toolbar { display: flex; align-items: center; gap: 10px; padding: 0 18px 12px; min-width: 0; }
+.evidence-toolbar label, .evidence-toolbar a { flex: 0 0 auto; font-size: 12px; }
+.evidence-toolbar select { flex: 1; min-width: 0; height: 32px; border: 1px solid var(--line); border-radius: 4px; background: white; }
+.evidence-comparison { margin: 0 18px 12px; max-width: calc(100% - 36px); }
+.evidence-comparison table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.evidence-comparison th, .evidence-comparison td { padding: 7px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.evidence-details { padding: 9px 18px; border-top: 1px solid var(--line); min-width: 0; font-size: 12px; }
+.evidence-details summary { cursor: pointer; }
+.evidence-details pre { max-height: 260px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; font: 11px/1.5 Consolas, monospace; }
 .run-lower-grid { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(260px, .7fr); gap: 16px; margin-top: 16px; }
 .log-panel, .run-list-panel { min-height: 220px; }
 .log-view { min-height: 155px; max-height: 250px; margin: 0 18px 17px; padding: 13px 14px; overflow: auto; border: 1px solid #eef0f5; border-radius: 10px; color: #536179; background: #fafbfe; font-family: Consolas, "Microsoft YaHei UI", monospace; font-size: 10px; line-height: 1.65; white-space: pre-wrap; }
@@ -222,6 +231,7 @@ input:focus, textarea:focus { border-color: #a59cf5; box-shadow: 0 0 0 3px rgba(
 .target-footer > div { display: flex; flex-shrink: 0; gap: 8px; }
 .target-result { margin-top: 12px; padding: 9px 12px; border-radius: 8px; background: #f4f6fb; color: #647189; font-size: 12px; line-height: 1.7; white-space: pre-line; }
 .target-result.ready { background: #eaf8f1; color: #267751; }
+#journeyRecordInfo { overflow-wrap: anywhere; }
 .target-result.error { background: #fff1f0; color: #b35157; }
 .target-source { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 10px; color: var(--muted); font-size: 10px; }
 .target-source a { color: var(--primary); text-decoration: none; }
@@ -252,6 +262,20 @@ input:focus, textarea:focus { border-color: #a59cf5; box-shadow: 0 0 0 3px rgba(
   .quick-lookup-grid { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 700px) {
+  body:has(#tab-run.active) { min-width: 0; }
+  body:has(#tab-run.active) .app-shell { flex-direction: column; }
+  body:has(#tab-run.active) .sidebar { width: 100%; flex-basis: auto; padding: 12px; }
+  body:has(#tab-run.active) .sidebar-foot { display: none; }
+  body:has(#tab-run.active) .brand { padding-bottom: 12px; }
+  body:has(#tab-run.active) .nav-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body:has(#tab-run.active) .main-content { padding: 16px; }
+  body:has(#tab-run.active) .topbar, body:has(#tab-run.active) .top-actions { flex-wrap: wrap; gap: 10px; }
+  #tab-run .run-grid, #tab-run .run-lower-grid, #tab-run .target-form-grid { grid-template-columns: minmax(0, 1fr); }
+  #tab-run .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #tab-run .target-footer { flex-wrap: wrap; }
+  #tab-run .target-footer > div { flex-wrap: wrap; flex-shrink: 1; }
+  #tab-run .runtime-pill { white-space: normal; overflow-wrap: anywhere; }
+  #metric-run { font-size: 13px; overflow-wrap: anywhere; letter-spacing: 0; }
   body:has(#tab-quick-lookup.active) { min-width: 0; }
   body:has(#tab-quick-lookup.active) .app-shell { flex-direction: column; }
   body:has(#tab-quick-lookup.active) .sidebar { width: 100%; flex-basis: auto; padding: 12px; }

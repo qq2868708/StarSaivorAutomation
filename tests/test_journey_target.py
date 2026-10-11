@@ -139,7 +139,10 @@ class JourneyTargetTests(unittest.TestCase):
     def test_ambiguous_equipment_handler_never_clicks(self):
         ctx = SimpleNamespace(capture=Mock(), ocr=Mock(), controller=Mock(),
                               engine=SimpleNamespace(is_rule_engine_mode=False), journey_target=goal())
-        with patch("src.handlers._ocr_region", return_value="装备图片，属性不明"):
+        import numpy as np
+        ctx.capture.capture_game.return_value = np.zeros((900, 1600, 3), np.uint8)
+        with patch("src.handlers._ocr_region", side_effect=lambda engine, image, *region:
+                   "选择奖励" if region == CardSelectHandler.TITLE_REGION else "装备图片，属性不明"):
             with self.assertRaises(JourneyTargetPending):
                 CardSelectHandler().handle(ctx)
         ctx.controller.click_at_percent.assert_not_called()
@@ -151,12 +154,16 @@ class JourneyTargetTests(unittest.TestCase):
         ctx = SimpleNamespace(capture=Mock(), ocr=Mock(), controller=Mock(), logger=Mock(),
             target_selection_phase=Mock(), journey_target=goal(revision='goal'))
         choice = {'index': 1, 'material': '暴击', 'combo_code': 'AX5'}
+        import numpy as np
+        ctx.capture.capture_game.return_value = np.zeros((900, 1600, 3), np.uint8)
         with patch('src.recognition.ScreenDetector', return_value=detector), \
+             patch.object(CardSelectHandler, "_select_available_slot",
+                          return_value=(ctx.capture.capture_game.return_value, (.5, .83))), \
              patch('src.handlers._ocr_region', return_value='主菜单'):
             self.assertTrue(CardSelectHandler()._execute_target_card(ctx, ['攻击装备', '暴击装备', '速度装备'], choice))
         self.assertEqual(ctx.target_selection_phase.call_args_list[0].args[0], 'prepared')
         self.assertEqual(ctx.target_selection_phase.call_args_list[1].args[0], 'confirmed')
-        self.assertEqual(ctx.controller.click_at_percent.call_count, 2)
+        ctx.controller.click_at_percent.assert_called_once_with(.5, .83)
 
     def test_runtime_applies_direction_and_keeps_uncertain_progress_after_restart(self):
         with tempfile.TemporaryDirectory() as root:

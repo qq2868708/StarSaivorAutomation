@@ -3,7 +3,7 @@ import sys
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 import cv2
@@ -13,10 +13,19 @@ from src.trainer import Trainer, TrainingMetricScanState, _TRAINING_ROWS
 
 
 class TrainingRuntimeTests(unittest.TestCase):
+    def test_normal_training_enables_input_refocus(self):
+        with patch("src.trainer.ScreenCapture"), \
+             patch("src.trainer.Controller") as controller, \
+             patch("src.trainer.GameUI", side_effect=RuntimeError("stop before OCR initialization")):
+            with self.assertRaisesRegex(RuntimeError, "stop before OCR"):
+                Trainer({}, development_mode=False)
+        self.assertTrue(controller.call_args.kwargs["auto_refocus"])
+
     def test_background_card_match_cannot_preempt_training(self):
         trainer = Trainer.__new__(Trainer)
         trainer.config = {'arcanum': {'enabled': True}}
         trainer.round_count = 1
+        trainer._scan_mode = "normal"
         trainer._handler_ctx = SimpleNamespace(round_count=0, detected_turn=None,
                                               try_detect_turn=Mock())
         trainer._try_click_arcanum = Mock(side_effect=AssertionError('legacy card click'))

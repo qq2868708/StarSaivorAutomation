@@ -84,7 +84,7 @@
             </details>
             <div class="target-footer"><p id="targetCoverage"></p><div><button class="button secondary" id="precheckTargetBtn">预检查</button><button class="button primary" id="saveTargetBtn">保存本轮目标</button></div></div>
             <div class="target-result" id="targetResult" role="status">选择目标技能后，脚本自动规划所需装备和三月声援方向。</div>
-            <p class="target-source"><a href="https://docs.qq.com/sheet/DZkh2QmxKdnJUaVpw?tab=6chp1a" target="_blank" rel="noopener">角色推荐表 ↗</a><a href="https://docs.qq.com/sheet/DZkh2QmxKdnJUaVpw?tab=lzqghu" target="_blank" rel="noopener">装备技能表 ↗</a><span>装备仅有图片、结果不明或材料已齐但需处置时，脚本会暂停等待核对。</span></p>
+            <p class="target-source"><a href="https://docs.qq.com/sheet/DZkh2QmxKdnJUaVpw?tab=6chp1a" target="_blank" rel="noopener">角色推荐表 ↗</a><a href="https://docs.qq.com/sheet/DZkh2QmxKdnJUaVpw?tab=lzqghu" target="_blank" rel="noopener">装备技能表 ↗</a><span>保底选择与目标达成分别记录，未核验的装备不会记为已获得。</span></p>
           </div>
         </details>
         <details class="panel target-panel" id="journeyRecordsPanel">
@@ -140,7 +140,7 @@
             <div class="panel-heading">
               <div>
                 <h2>历史决策</h2>
-                <p>点击一行查看做出决策时的截图</p>
+                <p>候选项、执行选择与证据</p>
               </div>
               <span class="count-pill" id="decisionCount">0</span>
             </div>
@@ -155,10 +155,15 @@
           <article class="panel screenshot-panel">
             <div class="panel-heading">
               <div>
-                <h2>决策时截图</h2>
-                <p id="screenshotCaption">从左侧选择历史记录</p>
+                <h2>决策证据</h2>
+                <p id="screenshotCaption">未选择记录</p>
               </div>
               <span class="image-badge" id="screenshotBadge">未选择</span>
+            </div>
+            <div class="evidence-toolbar" id="evidenceToolbar" hidden>
+              <label for="decisionEvidenceSelect">证据帧</label>
+              <select id="decisionEvidenceSelect"></select>
+              <a id="evidenceOpen" target="_blank" rel="noopener">原图</a>
             </div>
             <div class="screenshot-stage" id="screenshotStage">
               <div class="screenshot-placeholder" id="screenshotPlaceholder">
@@ -169,6 +174,15 @@
               <img id="decisionImage" alt="决策时游戏截图" hidden>
             </div>
             <div class="screenshot-path" id="screenshotPath">—</div>
+            <div class="evidence-comparison table-wrap" id="evidenceComparison" hidden></div>
+            <details class="evidence-details" id="evidenceData" hidden>
+              <summary>解析数据与来源</summary>
+              <pre id="evidenceDataText"></pre>
+            </details>
+            <details class="evidence-details" id="decisionRules" hidden>
+              <summary>决策规则与最终选择</summary>
+              <pre id="decisionRulesText"></pre>
+            </details>
           </article>
         </div>
 

@@ -8,6 +8,9 @@ const state = {
   isNewEvent: false,
   activeTab: "run",
   quickLookup: null,
+  selectedActionId: null,
+  evidenceFrames: [],
+  selectedEvidenceId: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -82,7 +85,13 @@ function renderOverview(data) {
   $("updatedLabel").textContent = `更新于 ${new Date().toLocaleTimeString()}`;
   $("healthDot").style.background = "#50d69b";
 
-  const actions = data.actions || [];
+  const actions = (data.actions || []).map(action => {
+    if (action.type !== "card_select") return action;
+    const detail = action.details || {};
+    const label = {confirmed: "已确认领取", confirming: "确认领取", planned: "计划选择"}[detail.phase] || "未核验";
+    return {...action, decision: `奖励 ${Number(detail.card_index) + 1} · ${label}`};
+  });
+  state.overview = {...data, actions};
   const rows = $("decisionRows");
   if (!actions.length) {
     rows.innerHTML = '<tr><td colspan="5" class="empty-cell">暂无决策记录，运行脚本后点击刷新</td></tr>';
@@ -93,11 +102,13 @@ function renderOverview(data) {
         <td class="type-cell">${esc(action.type)}</td>
         <td title="${esc(action.decision)}">${esc(action.decision)}</td>
         <td title="${esc(action.target)}">${esc(action.target)}</td>
-        <td class="${action.has_screenshot ? "shot-yes" : ""}">${action.has_screenshot ? "有" : "—"}</td>
+        <td class="${action.has_screenshot ? "shot-yes" : ""}">${action.evidence?.frames?.length ? `${action.evidence.available_frames}/${action.evidence.frames.length} 帧` : action.has_screenshot ? "1 帧" : "—"}</td>
       </tr>`).join("");
     rows.querySelectorAll("tr[data-action-index]").forEach((row) => {
       row.addEventListener("click", () => selectAction(Number(row.dataset.actionIndex), row));
     });
+    const selectedIndex = actions.findIndex(action => action.action_id && action.action_id === state.selectedActionId);
+    if (selectedIndex >= 0) selectAction(selectedIndex, rows.querySelector(`[data-action-index="${selectedIndex}"]`), true);
   }
 
   const logLines = actions.slice(0, 80).map((action) => {
@@ -118,11 +129,46 @@ function renderOverview(data) {
   }
 }
 
-function selectAction(index, row) {
+function selectAction(index, row, preserveFrame = false) {
   document.querySelectorAll("#decisionRows tr").forEach((item) => item.classList.remove("selected"));
   if (row) row.classList.add("selected");
   const action = (state.overview?.actions || [])[index];
   if (!action) return;
+  state.selectedActionId = action.action_id || null;
+  const frames = action.evidence?.frames || [];
+  state.evidenceFrames = frames;
+  $("evidenceToolbar").hidden = frames.length === 0;
+  $("evidenceData").hidden = frames.length === 0;
+  $("decisionRules").hidden = false;
+  $("decisionRulesText").textContent = JSON.stringify({
+    decision: action.details, strategy: action.strategy_snapshot,
+  }, (key, value) => key === "evidence" ? undefined : value, 2);
+  $("evidenceComparison").hidden = frames.length === 0;
+  const candidates = frames.filter(frame => frame.role === "candidate");
+  const training = action.evidence?.kind === "training";
+  const reward = action.evidence?.kind === "card_select";
+  const headings = reward ? ["奖励", "可选", "匹配顺位", "次级分值", "排除原因"]
+    : training ? ["训练", "增益", "失败率", "支援", "闪光", "优势"]
+    : ["委托", "我方", "建议", "等级差", "方式", "可挑战"];
+  $("evidenceComparison").innerHTML = candidates.length ? `<table><thead><tr>${headings.map(label => `<th>${esc(label)}</th>`).join("")}</tr></thead><tbody>${candidates.map(frame => {
+    const v = frame.values || {};
+    const cells = reward
+      ? [frame.label, v.enabled ? "是" : "否", v.keyword_rank >= 0 ? v.keyword_rank + 1 : "未匹配", v.secondary_score ?? "—", v.blocked_reason || "—"]
+      : training
+      ? [frame.label, v.gain ?? "未知", v.fail_rate == null ? "未知" : `${v.fail_rate}%`, v.icons ?? "未知", v.is_flash ? "是" : "否", v.is_advantage ? "是" : "否"]
+      : [frame.label, v.my_rank ?? "未知", v.recommended ?? "未知", v.gap ?? "未知", v.mode === "battle" ? "战斗" : v.mode === "skip" ? "跳过" : "不挑战", v.eligible ? "是" : "否"];
+    return `<tr>${cells.map(cell => `<td>${esc(cell)}</td>`).join("")}</tr>`;
+  }).join("")}</tbody></table>` : "";
+  if (frames.length) {
+    $("decisionEvidenceSelect").innerHTML = frames.map((frame, i) => `<option value="${i}">${esc(frame.label)}${frame.available ? "" : "（图片缺失）"}</option>`).join("");
+    const oldIndex = preserveFrame ? frames.findIndex(frame => frame.id === state.selectedEvidenceId) : -1;
+    const frameIndex = oldIndex >= 0 ? oldIndex : 0;
+    $("decisionEvidenceSelect").value = String(frameIndex);
+    $("screenshotBadge").textContent = action.evidence.complete ? "候选图像齐全" : "证据不完整";
+    $("screenshotBadge").classList.toggle("ready", Boolean(action.evidence.complete));
+    selectEvidenceFrame(frameIndex);
+    return;
+  }
   const image = $("decisionImage");
   const placeholder = $("screenshotPlaceholder");
   if (action.screenshot_url) {
@@ -647,6 +693,9 @@ function renderJourneyRecord() {
   $("journeyRecordInfo").textContent = [`目标：${target ? `${target.character} · ${target.combo_code}` : "未记录"}`,
     `实际角色：${setupText("character")}`, `旅程记录：${setupText("journey_records")}`, `支援卡：${setupText("support_cards")}`,
     `运行过程：${record.outcome.execution_mode === "exploration" ? "含未知事件探索" : "正常规则"} · 探索次数：${record.exploration?.attempts || 0}`,
+    `偏离规则的保底：${record.fallbacks?.length || 0} 次`,
+    ...(record.fallbacks || []).map((item) =>
+      `${item.ts} · ${item.scope}：${item.reason}\n原规则：${JSON.stringify(item.rule)}\n保底选择：${JSON.stringify(item.chosen)} · 记录 ${item.action_id}`),
     `关联运行：${record.segments.length} 次 · 待核对字段：${record.data_quality.missing_fields.length} 项`,
     ...record.data_quality.warnings].join("\n");
   $("journeyResultFields").querySelectorAll("[data-final-stat]").forEach((input) => { input.value = record.outcome.final_stats[input.dataset.finalStat].value ?? ""; });
@@ -663,7 +712,7 @@ function renderJourneyRecord() {
   if (evidenceScreenshot) $("journeyEndScreenshot").href = `/api/screenshot?path=${encodeURIComponent(evidenceScreenshot)}`;
   const achieved = record.outcome.target_skill_achieved.value;
   $("journeyResultMessage").textContent = !record.outcome.journey_ended ? "本轮旅程尚未结束，最终结果保持待核对。" :
-    `目标技能${achieved === null ? "尚未核对" : achieved ? "已达成" : "未达成"}；${record.outcome.execution_mode === "exploration" ? "本轮含探索过程" : "本轮按正常规则完成"}。` +
+    `目标技能${achieved === null ? "尚未核对" : achieved ? "已达成" : "未达成"}；${record.fallbacks?.length ? `本轮含 ${record.fallbacks.length} 次偏离规则的保底` : record.outcome.execution_mode === "exploration" ? "本轮含探索过程" : "本轮按正常规则完成"}。` +
     (scan ? `最近一次画面扫描：${formatTime(scan.observed_at)}；仍待核对 ${record.data_quality.missing_fields.length} 项。` : "可读取当前放大镜页面自动补录。");
 }
 
@@ -844,6 +893,25 @@ function renderQuickLookupFamily(family, value, task, logs = []) {
     return `<div class="quick-lookup-card ${item.verified === false ? "failed" : ""}">${source ? `<img src="${source}" alt="${esc(item.name)}" loading="lazy">` : "<div class=\"screenshot-placeholder\">无图</div>"}<strong>${esc(item.name)}</strong><small>${state}</small></div>`;
   }).join("");
 }
+
+function selectEvidenceFrame(index) {
+  const frame = state.evidenceFrames[index];
+  if (!frame) return;
+  state.selectedEvidenceId = frame.id;
+  const image = $("decisionImage");
+  image.hidden = !frame.screenshot_url;
+  $("screenshotPlaceholder").hidden = Boolean(frame.screenshot_url);
+  if (frame.screenshot_url) image.src = frame.screenshot_url;
+  else image.removeAttribute("src");
+  $("screenshotCaption").textContent = `${frame.label} · ${formatTime(frame.observed_at)}`;
+  $("screenshotPath").textContent = frame.screenshot || "图片缺失";
+  $("evidenceOpen").hidden = !frame.screenshot_url;
+  if (frame.screenshot_url) $("evidenceOpen").href = frame.screenshot_url;
+  else $("evidenceOpen").removeAttribute("href");
+  $("evidenceDataText").textContent = JSON.stringify(frame.values || {}, null, 2);
+}
+
+$("decisionEvidenceSelect").addEventListener("change", event => selectEvidenceFrame(Number(event.target.value)));
 
 function renderQuickLookup(data) {
   state.quickLookup = data || null;

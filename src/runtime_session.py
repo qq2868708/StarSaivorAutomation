@@ -53,6 +53,7 @@ class RuntimeSession:
         self._round_deadline = 0
         self._paused_at = None
         self._diagnostics = {}
+        self._auto_recovery_counts = {}
         self._journey_target_store = JourneyTargetStore(self.runtime.root)
         self._journey_target = None
         self._journey_target_state = {}
@@ -144,6 +145,7 @@ class RuntimeSession:
             state, reason, run_id=self._run_id, round_count=self.round_count,
             pause_id=self._pause_id, frame_id=self._frame_id,
             last_handler=self._active_handler_name,
+            auto_refocus=bool(getattr(self.controller, "auto_refocus", False)),
             journey_id=self._journey_id, journey_started_at=self._journey_started_at,
             screenshot=self._last_frame_screenshot, diagnostics=self._diagnostics,
             journey_target=self._journey_target, journey_target_state=self._journey_target_state, **extra)
@@ -355,6 +357,40 @@ class RuntimeSession:
                     self._runtime_status("paused_safe" if self._safe_paused else "paused_manual",
                                          self._safe_pause_reason, error=str(error))
         return self._stop_requested
+
+    def _try_auto_recovery(self, error):
+        from .controller import SceneTransitionError
+        if self._paused or self._stop_requested:
+            return False
+        limit = int(self.config.get("safety", {}).get("auto_recovery_attempts", 0))
+        reason = getattr(error, "reason", type(error).__name__)
+        recoverable = isinstance(error, SceneTransitionError) or (
+            isinstance(error, RuntimeInterrupt) and reason in {"round_timeout", "runtime_timeout"})
+        if not recoverable or limit <= 0:
+            return False
+        key = f"{self._active_handler_name}:{reason}"
+        attempt = self._auto_recovery_counts.get(key, 0) + 1
+        if attempt > limit:
+            return False
+        self._auto_recovery_counts[key] = attempt
+        self._round_deadline = 0
+        if reason == "runtime_timeout":
+            self._runtime_started = time.monotonic()
+        self._handler_ctx.pending_screenshot = None
+        self._handler_ctx.pending_action = ""
+        self._recovering = True
+        self._same_handler_count = self._consecutive_unknown = 0
+        self._stagnant_frame = None
+        self.logger.log_fallback(
+            "runtime_recovery", str(error), {"recovery_limit": limit, "reason": reason},
+            {"attempt": attempt, "handler": self._active_handler_name,
+             "action": "rebind_window_and_redispatch"})
+        self.logger.save("recovering", announce=False, close_turn=False)
+        self._write_checkpoint("recovering", reason=reason)
+        self._runtime_status("recovering", reason)
+        self._event("automatic_recovery", reason=reason, attempt=attempt, limit=limit)
+        print(f"[自动恢复] {reason}：重新截图并调度 ({attempt}/{limit})")
+        return True
 
     def _enter_safe_pause(self, reason, screenshot_path=None, error=""):
         self._paused = self._safe_paused = True

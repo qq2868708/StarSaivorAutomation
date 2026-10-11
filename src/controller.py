@@ -78,6 +78,10 @@ class InputTargetError(RuntimeError):
     """Stop the run when input can no longer reach the selected game window."""
 
 
+class SceneTransitionError(InputTargetError):
+    """A capture or transition can be retried only through fresh dispatch."""
+
+
 class Controller:
     """输入控制器 - SendInput 硬件级点击 + 光标位置恢复"""
 
@@ -144,7 +148,7 @@ class Controller:
     def _check_input_target(self):
         if not self._hwnd or not user32.IsWindow(self._hwnd):
             raise InputTargetError("游戏窗口已关闭，停止发送输入")
-        if user32.GetForegroundWindow() != self._hwnd:
+        if not is_window_foreground(self._hwnd):
             if self.auto_refocus:
                 self.focus_game_window()
             if is_window_foreground(self._hwnd):

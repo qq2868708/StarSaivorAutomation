@@ -44,6 +44,83 @@ class InputControlTests(unittest.TestCase):
         controller.after_action = Mock()
         return controller
 
+    def test_each_input_refocuses_before_sending(self):
+        for kind in ("click", "key", "scroll"):
+            with self.subTest(kind=kind):
+                events = []
+                foreground = [False]
+                controller = Controller(click_delay=0, auto_refocus=True)
+                controller.set_window_handle(1)
+                controller._percent_to_screen = Mock(return_value=(20, 30))
+                controller.wait = Mock()
+
+                def focus():
+                    events.append("focus")
+                    foreground[0] = True
+
+                controller.focus_game_window = Mock(side_effect=focus)
+                with patch("src.controller.user32.IsWindow", return_value=True), \
+                     patch("src.controller.is_window_foreground", side_effect=lambda _: foreground[0]), \
+                     patch("src.controller.user32.SendInput",
+                           side_effect=lambda *args: (events.append("input"), 1)[1]), \
+                     patch("src.controller.time.sleep"):
+                    if kind == "click":
+                        controller.click_at_percent(.5, .5)
+                    elif kind == "key":
+                        controller.send_escape()
+                    else:
+                        controller.scroll_at_percent(.5, .5)
+                self.assertEqual(events[0], "focus")
+                self.assertIn("input", events)
+                controller.focus_game_window.assert_called_once()
+
+    def test_failed_foreground_confirmation_blocks_all_inputs(self):
+        for kind in ("click", "key", "scroll"):
+            with self.subTest(kind=kind):
+                controller = Controller(auto_refocus=True)
+                controller.set_window_handle(1)
+                controller.focus_game_window = Mock()
+                with patch("src.controller.user32.IsWindow", return_value=True), \
+                     patch("src.controller.is_window_foreground", return_value=False), \
+                     patch("src.controller.user32.SendInput") as send:
+                    with self.assertRaises(InputTargetError):
+                        if kind == "click":
+                            controller.click_at_percent(.5, .5)
+                        elif kind == "key":
+                            controller.send_escape()
+                        else:
+                            controller.scroll_at_percent(.5, .5)
+                    send.assert_not_called()
+                controller.focus_game_window.assert_called_once()
+
+    def test_confirmed_game_foreground_needs_no_refocus(self):
+        controller = Controller(auto_refocus=True)
+        controller.set_window_handle(1)
+        controller.focus_game_window = Mock()
+        with patch("src.controller.user32.IsWindow", return_value=True), \
+             patch("src.controller.is_window_foreground", return_value=True):
+            controller._check_input_target()
+        controller.focus_game_window.assert_not_called()
+
+    def test_opt_out_keeps_scan_foreground_guard(self):
+        controller = Controller(auto_refocus=False)
+        controller.set_window_handle(1)
+        controller.focus_game_window = Mock()
+        with patch("src.controller.user32.IsWindow", return_value=True), \
+             patch("src.controller.is_window_foreground", return_value=False):
+            with self.assertRaises(InputTargetError):
+                controller._check_input_target()
+        controller.focus_game_window.assert_not_called()
+
+    def test_closed_game_does_not_trigger_refocus(self):
+        controller = Controller(auto_refocus=True)
+        controller.set_window_handle(1)
+        controller.focus_game_window = Mock()
+        with patch("src.controller.user32.IsWindow", return_value=False):
+            with self.assertRaises(InputTargetError):
+                controller._check_input_target()
+        controller.focus_game_window.assert_not_called()
+
     def test_pending_pause_prevents_mouse_down(self):
         controller = self.controller()
         controller.before_action = Mock(side_effect=RuntimeInterrupt("pause"))

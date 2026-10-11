@@ -29,6 +29,27 @@ def target(**changes):
 
 
 class JourneyRecordTests(unittest.TestCase):
+    def test_fallback_results_survive_resumes_without_duplicate_saves(self):
+        with tempfile.TemporaryDirectory() as root:
+            logger = RunLogger(root=root)
+            logger.bind_journey("f" * 32, "2026-10-11T12:00:00+08:00")
+            logger.set_screenshot(np.zeros((90, 160, 3), np.uint8))
+            logger.log_fallback("commission", "全部超限", {"max_rank_gap": 4},
+                                {"tier": "低阶", "mode": "battle", "gap": 7})
+            path = logger.save("running")
+            logger.save("running")
+            payload = json.loads(Path(path).read_text(encoding="utf-8"))
+            self.assertEqual(payload["summary"]["fallback_count"], 1)
+            self.assertTrue((Path(root) / payload["fallbacks"][0]["screenshot"]).is_file())
+            resumed = RunLogger(root=root)
+            resumed.bind_journey("f" * 32, "2026-10-11T12:00:00+08:00", logger._run_id)
+            resumed.save("journey_end")
+            record = JourneyRecordStore(root).read("f" * 32)
+            self.assertEqual(record["outcome"]["fallback_count"], 1)
+            self.assertFalse(record["outcome"]["rules_fully_followed"])
+            self.assertTrue(record["outcome"]["journey_ended"])
+            self.assertEqual(record["fallbacks"][0]["run_id"], logger._run_id)
+
     def test_unknown_setup_is_different_from_confirmed_empty_loadout(self):
         self.assertIsNone(normalize_setup({})["support_cards"])
         self.assertEqual(normalize_setup({"support_cards": []})["support_cards"], [])

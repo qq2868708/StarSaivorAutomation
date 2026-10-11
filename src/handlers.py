@@ -28,6 +28,8 @@ import numpy as np
 
 from .event_effects import choose_option, score_options
 from .journey_target import direction_choice, equipment_choice, JourneyTargetPending
+from .controller import SceneTransitionError
+from .commission import TIERS, battle_mode, select_commission, read_panel, read_battle_prompt, normalized_rows, inside, same_commission
 
 
 # ============================================================
@@ -396,6 +398,9 @@ class SkipHandler(Handler):
     SKIP_CLICK_BATTLE2_X = 0.5855
     SKIP_CLICK_BATTLE2_Y = 0.6542
 
+    def __init__(self, config=None):
+        self.config = config or {}
+
     @property
     def priority(self): return 0
 
@@ -435,24 +440,54 @@ class SkipHandler(Handler):
             ctx.controller.click_at_percent(*position)
             ctx.controller.wait(0.5)
             ctx.pending_screenshot = ctx.capture.capture_game()
-        elif skip_type == "battle2":
-            print("[SKIP] 评鉴战确认")
-            ctx.controller.click_at_percent(self.SKIP_CLICK_BATTLE2_X, self.SKIP_CLICK_BATTLE2_Y)
-            time.sleep(0.3)
-            ctx.controller.send_space()
-            time.sleep(0.1)
-            ctx.controller.click_center_multi(count=5, interval=0.01, click_delay=0.01)
-            time.sleep(0.3)
-        elif skip_type == "battle":
-            print("[SKIP] 跳过战斗")
-            ctx.controller.click_at_percent(self.SKIP_CLICK_BATTLE_X, self.SKIP_CLICK_BATTLE_Y)
-            time.sleep(0.3)
-            ctx.controller.click_at_percent(self.SKIP_CLICK_BATTLE2_X, self.SKIP_CLICK_BATTLE2_Y)
-            time.sleep(0.3)
-            ctx.controller.send_space()
-            time.sleep(0.1)
-            ctx.controller.click_center_multi(count=5, interval=0.01, click_delay=0.01)
-            time.sleep(0.3)
+        elif skip_type in {"battle", "battle2"}:
+            from .controller import InputTargetError
+            screenshot = ctx.capture.capture_game()
+            if screenshot is None:
+                raise InputTargetError("战斗确认截图失败")
+            height, width = screenshot.shape[:2]
+            items = ctx.ocr.recognize_detailed(screenshot)
+            prompt = read_battle_prompt(items, width, height)
+            if prompt and prompt["commission"]:
+                # A recovered process must re-scan the list, not skip a battle
+                # whose candidate evidence and rank difference were lost.
+                if ctx.logger:
+                    ctx.logger.begin_decision("commission", TIERS)
+                    ctx.logger.record_decision_frame(None, "恢复时的委托确认", screenshot,
+                                                     prompt, role="confirmation")
+                    ctx.logger.log_commission(None, None, prompt["recommended"],
+                                              reason="missing_candidate_evidence", phase="recovery")
+                ctx.controller.send_escape()
+                CommissionHandler(self.config)._wait_panel(ctx)
+                return True
+            if prompt:
+                if prompt["recommendation_ambiguous"]:
+                    raise InputTargetError("战斗推荐标记冲突，停止自动选择")
+                mode = "battle" if prompt["recommendation"] == "battle" else "skip"
+                position = prompt[mode + "_position"]
+                reason = "ui_recommendation" if prompt["recommendation"] else "appraisal_default"
+            else:
+                rows = normalized_rows(items, width, height)
+                titles = [row for row in rows if "跳过战斗" in row["text"]
+                          and inside(row, (.25, .25, .50, .34))]
+                buttons = [row for row in rows if row["text"] in {"跳过战斗", "确认"}
+                           and inside(row, (.40, .60, .30, .17))]
+                if not titles or len(buttons) != 1:
+                    raise InputTargetError("未唯一确认战斗按钮，停止连点")
+                mode, reason = "skip", "skip_confirmation"
+                position = (buttons[0]["x"], buttons[0]["y"])
+            if ctx.logger:
+                ctx.logger.begin_decision("battle_confirmation", [])
+                ctx.logger.record_decision_frame(None, "战斗确认", screenshot,
+                                                 prompt or {"mode": mode}, role="confirmation")
+                ctx.logger.log_battle_choice(mode, prompt.get("recommendation") if prompt else None,
+                                             position, reason=reason)
+            ctx.controller.click_at_percent(*position)
+            if mode == "battle":
+                ctx.battle_auto_requested = False
+                ctx.battle_started_at = time.monotonic()
+            ctx.controller.wait(.4)
+            ctx.pending_screenshot = ctx.capture.capture_game()
         else:
             print("[SKIP] 快进")
             ctx.controller.click_at_percent(self.SKIP_CLICK_TOP_X, self.SKIP_CLICK_TOP_Y)
@@ -664,9 +699,8 @@ class BattleDefeatHandler(Handler):
     """
     战斗失败处理 — 移植自 SleepRunner BattleDefeatHandler.
 
-    每把跑马有 3 次重新挑战机会, 失败时:
-      - 剩余次数 > 0: 点击"重新挑战" → 直接点击第二个确认 (双确认同时显示)
-      - 剩余次数 = 0: 点击第一个确认退出, 重置次数
+    以游戏显示的剩余机会为准，分别核验重试、确认和离开。
+    无效点击不扣减本地次数，离开不重置次数。
 
     优先级 1, 比 BattleLeaveHandler(2) 高一级。
     """
@@ -716,33 +750,80 @@ class BattleDefeatHandler(Handler):
         return True
 
     def handle(self, ctx: HandlerContext) -> bool:
+        from .controller import InputTargetError
+        from .recognition import ScreenDetector
         screenshot = ctx.capture.capture_game()
-        if screenshot is not None:
-            if self._is_retry_dialog(FrameContext(screenshot), ctx.ocr):
-                print("[战斗] 重试确认弹窗, 点击确认")
-                ctx.controller.click_at_percent(self.CONFIRM2_X, self.CONFIRM2_Y)
-                time.sleep(0.5)
-                return True
-
-        if self._retries_remaining > 0:
-            self._retries_remaining -= 1
-            print(f"[战斗] FAIL, 重试 ({self._retries_remaining}/{self.MAX_RETRIES})")
-            ctx.controller.click_at_percent(self.RETRY_CLICK_X, self.RETRY_CLICK_Y)
-            time.sleep(0.2)
-            ctx.controller.click_at_percent(self.CONFIRM2_X, self.CONFIRM2_Y)
-            time.sleep(0.5)
+        if screenshot is None:
+            raise InputTargetError("战斗重试截图失败")
+        frame = FrameContext(screenshot)
+        dialog = self._is_retry_dialog(frame, ctx.ocr)
+        if not dialog and not self._is_defeat_screen(frame, ctx.ocr):
+            ctx.pending_screenshot = screenshot
+            return False
+        remaining = self._read_retries(screenshot, ctx.ocr, dialog=dialog)
+        if remaining is None:
+            raise InputTargetError("未确认游戏实际剩余重试次数，不消耗或退出")
+        self._retries_remaining = remaining
+        if dialog:
+            body = _ocr_region(ctx.ocr, screenshot, .24, .26, .53, .35)
+            if any(word in body for word in ("购买", "付费", "钻石", "星石", "支付", "花费")):
+                raise InputTargetError("重试提示额外资源费用，停止自动确认")
+            if remaining <= 0:
+                raise InputTargetError("重试次数已用尽，不确认重试")
+            label, region, mode = "确认", (.49, .63, .18, .12), "retry_confirm"
+        elif remaining > 0:
+            label, region, mode = "重新挑战", (.70, .86, .16, .12), "retry"
         else:
-            print(f"[战斗] 重试用尽, 退出")
-            ctx.controller.click_at_percent(self.CONFIRM1_X, self.CONFIRM1_Y)
-            time.sleep(0.5)
-            ctx.controller.click_center_multi(count=5, interval=0.01, click_delay=0.01)
-            time.sleep(0.3)
-            self._retries_remaining = self.MAX_RETRIES
+            label, region, mode = "离开", (.84, .86, .14, .12), "leave_defeat"
+        position = ScreenDetector(ctx.ocr).find_action_position(screenshot, label, region)
+        if position is None:
+            raise InputTargetError(f"未唯一定位战斗结果的「{label}」按钮")
+        if getattr(ctx, "logger", None):
+            ctx.logger.begin_decision("battle_retry", [])
+            ctx.logger.record_decision_frame(None, "战斗重试", screenshot,
+                                             {"remaining": remaining, "action": mode}, role="confirmation")
+            ctx.logger.log_battle_choice(mode, None, position, reason=f"displayed_retries={remaining}")
+        ctx.controller.click_at_percent(*position)
+        deadline = time.perf_counter() + 6
+        while time.perf_counter() < deadline:
+            ctx.controller.wait(.3)
+            current = ctx.capture.capture_game()
+            if current is None:
+                continue
+            next_frame = FrameContext(current)
+            next_dialog = self._is_retry_dialog(next_frame, ctx.ocr)
+            defeat = self._is_defeat_screen(next_frame, ctx.ocr)
+            if (mode == "retry" and next_dialog) or (not next_dialog and not defeat):
+                ctx.battle_auto_requested = False
+                ctx.battle_started_at = time.monotonic()
+                ctx.pending_screenshot = None
+                return True
+            if mode == "retry_confirm" and not next_dialog and defeat:
+                current_remaining = self._read_retries(current, ctx.ocr)
+                if current_remaining is not None and current_remaining < remaining:
+                    ctx.pending_screenshot = current
+                    return True
+        raise InputTargetError("战斗重试按钮未产生已确认转场，不扣减本地次数或重复连点")
 
-        return True
+    @staticmethod
+    def _read_retries(screenshot, ocr, *, dialog=False):
+        height, width = screenshot.shape[:2]
+        region = (.36, .56, .28, .08) if dialog else (.815, .91, .03, .04)
+        x, y, rw, rh = region
+        crop = screenshot[int(height*y):int(height*(y+rh)), int(width*x):int(width*(x+rw))]
+        values = []
+        for text, confidence, _ in ocr.recognize_detailed(crop):
+            if confidence < .80:
+                continue
+            compact = re.sub(r"\s+", "", text)
+            pattern = r"重新挑战可再([0-3])次" if dialog else r"[×xX]?([0-3])"
+            match = re.fullmatch(pattern, compact)
+            if match:
+                values.append(int(match[1]))
+        return values[0] if len(values) == 1 else None
 
     def _is_defeat_screen(self, frame, ocr_engine) -> bool:
-        """检测失败文字: DEFEAT (SleepRunner) 或 FAIL (中文游戏)"""
+        """FAIL 也用于休息结算，必须同时有战斗结果操作才接管。"""
         for rx, ry, rw, rh in self.DEFEAT_REGIONS:
             text = frame.get_ocr(ocr_engine, rx, ry, rw, rh)
             if not text:
@@ -753,12 +834,16 @@ class BattleDefeatHandler(Handler):
             if "EFEAT" in normalized:
                 return True
             if "FAIL" in normalized:
-                return True
+                if self._has_retry_button(frame, ocr_engine):
+                    return True
+                leave = frame.get_ocr(ocr_engine, .84, .86, .14, .12)
+                if re.sub(r"\s+", "", leave) == "离开":
+                    return True
         return False
 
     def _has_retry_button(self, frame, ocr_engine) -> bool:
-        """检测右下角 '重新挑战' 按钮文字 (保留用于将来可能的 OCR 辅助判断)"""
-        text = frame.get_ocr(ocr_engine, *(0.60, 0.88, 0.22, 0.10))
+        """检测实机右下角的重新挑战按钮。"""
+        text = frame.get_ocr(ocr_engine, .70, .86, .16, .12)
         if not text:
             return False
         normalized = text.replace(" ", "").replace("\r", "").replace("\n", "").replace("　", "").strip()
@@ -1441,7 +1526,12 @@ class EventHandler(Handler):
             return False
 
         if self.config.get('events', {}).get('require_document_effects', False) or getattr(ctx, 'journey_target', None):
-            return self._handle_document_event(ctx, screenshot)
+            try:
+                return self._handle_document_event(ctx, screenshot)
+            except (EventDecisionPending, JourneyTargetPending) as error:
+                if not self.config.get("safety", {}).get("progress_fallbacks", False):
+                    raise
+                return self._fallback_event(ctx, str(error))
 
         # OCR 选项文字和标记文字
         option_text = _ocr_region(ctx.ocr, screenshot, *self.OPTION_REGIONS[0])
@@ -1574,6 +1664,46 @@ class EventHandler(Handler):
         time.sleep(0.15)
         return True
 
+    def _fallback_event(self, ctx, reason):
+        from .recognition import ScreenDetector
+        screenshot = ctx.capture.capture_game()
+        if screenshot is None:
+            raise SceneTransitionError("事件保底截图失败")
+        detector = ScreenDetector(ctx.ocr)
+        marker = detector.read_region_text(screenshot, .035, .14, .40, .16)
+        rows = detector.read_event_option_rows(screenshot)
+        available = [(i, row) for i, row in enumerate(rows)
+                     if row.get("enabled") and not any(word in row.get("text", "")
+                     for word in ("购买", "支付", "花费", "消耗", "用钱", "钻石", "星石"))]
+        if not marker or not available:
+            raise EventDecisionPending("事件保底未找到明确且无需资源支付的可用选项")
+        index, row = available[0]
+        if ctx.logger:
+            ctx.logger.begin_decision("event_fallback", [])
+            ctx.logger.record_decision_frame(None, "事件保底选项", screenshot,
+                                            {"marker": marker, "options": rows}, role="state")
+            ctx.logger.log_fallback(
+                "event", reason, {"target": getattr(ctx, "journey_target", None),
+                                  "policy": "document_or_target_preferred"},
+                {"index": index + 1, "text": row["text"], "policy": "first_enabled_without_payment"},
+                candidates=rows)
+        ctx.controller.click_at_percent(.80, row["y"])
+        deadline = time.perf_counter() + 6
+        while time.perf_counter() < deadline:
+            ctx.controller.wait(.4)
+            current = ctx.capture.capture_game()
+            if current is None:
+                continue
+            after = detector.read_event_option_rows(current)
+            if [r["text"] for r in after] != [r["text"] for r in rows]:
+                ctx.pending_screenshot = current
+                if ctx.logger:
+                    ctx.logger.record_decision_frame(None, "事件保底后续", current,
+                                                    {"transition_confirmed": True}, role="result")
+                    ctx.logger.log_event("progress_fallback", marker, index + 1, len(rows), False, False)
+                return True
+        raise SceneTransitionError("事件保底后未确认转场，重新识别")
+
     def _handle_document_event(self, ctx, screenshot):
         """用标题和所有选项共同核对文档记录；只点一次实测文字中心。"""
         from difflib import SequenceMatcher
@@ -1670,6 +1800,14 @@ class EventHandler(Handler):
             if index < 0 or index >= len(rows) or not rows[index].get('enabled'):
                 raise EventDecisionPending('探索模式无法定位可用事件选项，暂停等待核对。')
             print(f"[事件探索] {marker} → 选项{index + 1}；{selection['reason']}")
+            if ctx.logger and self.config.get("safety", {}).get("progress_fallbacks", False):
+                ctx.logger.begin_decision("event_exploration", [])
+                ctx.logger.record_decision_frame(None, "未收录事件选项", screenshot,
+                                                {"marker": marker, "options": rows}, role="state")
+                ctx.logger.log_fallback(
+                    "event", "事件尚无已核验文档规则，使用现有探索选择",
+                    {"policy": "document_verified"}, {"index": index + 1, "reason": selection["reason"]},
+                    candidates=rows)
             ctx.controller.click_at_percent(0.80, rows[index]['y'])
             deadline = time.perf_counter() + 6
             before = [normalize(row['text']) for row in rows]
@@ -2261,6 +2399,12 @@ class RewardAdvanceHandler(Handler):
     def can_handle(self, frame, ocr_engine) -> bool:
         if frame.screenshot is None:
             return False
+        if self._status_continue_position(frame, ocr_engine) is not None:
+            self._result_kind = "status"
+            return True
+        if self._rest_failure_continue_position(frame, ocr_engine) is not None:
+            self._result_kind = "rest_failure"
+            return True
         try:
             text = " ".join(item[0] for item in frame.recognize_full(ocr_engine))
         except Exception:
@@ -2280,6 +2424,23 @@ class RewardAdvanceHandler(Handler):
         return False
 
     def handle(self, ctx: HandlerContext) -> bool:
+        kind = getattr(self, "_result_kind", None)
+        if kind in {"status", "rest_failure"}:
+            screenshot = ctx.capture.capture_game()
+            if screenshot is None:
+                return False
+            locate = (self._status_continue_position if kind == "status"
+                      else self._rest_failure_continue_position)
+            position = locate(FrameContext(screenshot), ctx.ocr)
+            if position is None:
+                ctx.pending_screenshot = screenshot
+                return False
+            print(f"[{'状态解除' if kind == 'status' else '休息失败结算'}] 已核对标题和继续按钮")
+            source = "status_continue" if kind == "status" else "rest_result_continue"
+            ctx.controller.click_at_percent(*position, source=source)
+            ctx.controller.wait(.6)
+            ctx.pending_screenshot = ctx.capture.capture_game()
+            return True
         if getattr(self, "_result_kind", "reward") == "rest":
             print("[休息结算] GREAT SUCCESS → 点击底部继续")
         elif getattr(self, "_result_kind", "reward") == "battle":
@@ -2292,6 +2453,38 @@ class RewardAdvanceHandler(Handler):
         time.sleep(0.6)
         ctx.pending_screenshot = ctx.capture.capture_game()
         return True
+
+    @staticmethod
+    def _status_continue_position(frame, ocr):
+        try:
+            height, width = frame.screenshot.shape[:2]
+            rows = normalized_rows(frame.recognize_full(ocr), width, height)
+        except (ValueError, TypeError, RuntimeError):
+            return None
+        title = [row for row in rows if row["text"].rstrip("!！") == "状态解除"
+                 and inside(row, (.30, .15, .40, .18))]
+        buttons = [row for row in rows if row["text"].rstrip("▶►>") == "点击以继续"
+                   and inside(row, (.35, .85, .30, .13))]
+        if len(title) != 1 or len(buttons) != 1:
+            return None
+        return buttons[0]["x"], buttons[0]["y"]
+
+    @staticmethod
+    def _rest_failure_continue_position(frame, ocr):
+        try:
+            height, width = frame.screenshot.shape[:2]
+            rows = normalized_rows(frame.recognize_full(ocr), width, height)
+        except (ValueError, TypeError, RuntimeError):
+            return None
+        titles = [row for row in rows if row["text"] in {"露宿", "住处", "冥想室"}
+                  and inside(row, (.35, .05, .30, .09))]
+        results = [row for row in rows if row["text"].upper() == "FAIL"
+                   and inside(row, (.30, .14, .40, .15))]
+        buttons = [row for row in rows if row["text"].rstrip("▶►>") == "点击以继续"
+                   and inside(row, (.35, .85, .30, .13))]
+        if len(titles) != 1 or len(results) != 1 or len(buttons) != 1:
+            return None
+        return buttons[0]["x"], buttons[0]["y"]
 
 
 # ============================================================
@@ -2315,16 +2508,16 @@ class CardSelectHandler(Handler):
 
     # 3 张卡片点击位置 (SleepRunner: CardClickPercents)
     CARD_CLICK_POINTS = [
-        (0.20, 0.48),   # Card 1
+        (0.285, 0.48),  # Card 1
         (0.50, 0.48),   # Card 2
-        (0.80, 0.48),   # Card 3
+        (0.715, 0.48),  # Card 3
     ]
 
     # 3 张卡片 OCR 区域 (扩边减少边缘裁切)
     CARD_TEXT_REGIONS = [
-        (0.04, 0.24, 0.30, 0.42),
-        (0.35, 0.24, 0.30, 0.42),
-        (0.66, 0.24, 0.30, 0.42),
+        (0.185, 0.225, 0.20, 0.53),
+        (0.40, 0.225, 0.20, 0.53),
+        (0.615, 0.225, 0.20, 0.53),
     ]
 
     # 确认按钮 (SleepRunner: SelectDone)
@@ -2350,6 +2543,8 @@ class CardSelectHandler(Handler):
 
     def can_handle(self, frame, ocr_engine) -> bool:
         title = frame.get_ocr(ocr_engine, *self.TITLE_REGION)
+        if "获得奖励" in frame.get_ocr(ocr_engine, .36, .16, .28, .13):
+            return False
 
         # 排除事件屏幕: 如果存在旅程事件标记, 即使标题匹配也是事件不是卡片
         if self._has_event_marker(frame, ocr_engine):
@@ -2380,15 +2575,23 @@ class CardSelectHandler(Handler):
         return False
 
     def handle(self, ctx: HandlerContext) -> bool:
+        from .controller import InputTargetError
         screenshot = ctx.capture.capture_game()
         if screenshot is None:
             return False
+        title = _ocr_region(ctx.ocr, screenshot, *self.TITLE_REGION)
+        if not self._is_card_select_title(title):
+            raise InputTargetError("未确认奖励选择页，停止选卡")
 
         # 读取 3 张卡片文字
         card_texts = []
         for i, (rx, ry, rw, rh) in enumerate(self.CARD_TEXT_REGIONS):
             text = _ocr_region(ctx.ocr, screenshot, rx, ry, rw, rh)
             card_texts.append(text)
+        candidates = self._candidates(screenshot, card_texts)
+        available = [item["slot"] for item in candidates if item["enabled"]]
+        if not available:
+            raise InputTargetError("没有已确认可选的奖励卡，不重复点击不可选项")
 
         # 获取构建方向
         build_direction = "attack"
@@ -2402,70 +2605,192 @@ class CardSelectHandler(Handler):
         priority_keywords = self._get_priority_keywords(build_direction)
 
         target = getattr(ctx, 'journey_target', None)
+        target_fallback_reason = None
         if target:
             build_direction = target['training_direction']
             priority_keywords = self._get_priority_keywords(build_direction)
-            choice = equipment_choice(target, card_texts)
-            if choice:
-                if target.get('has_partner'):
-                    raise JourneyTargetPending('目标装备材料已齐；需要核对后续装备处置规则')
-                return self._execute_target_card(ctx, card_texts, choice)
+            try:
+                choice = equipment_choice(target, card_texts)
+                if choice:
+                    if target.get('has_partner'):
+                        raise JourneyTargetPending('目标装备材料已齐，改按普通可用奖励优先级')
+                    if choice["index"] not in available:
+                        choice = equipment_choice(target, [
+                            text if i in available else "" for i, text in enumerate(card_texts)
+                        ], equipment_context=True)
+                    return self._execute_target_card(ctx, card_texts, choice, screenshot=screenshot,
+                                                      candidates=candidates)
+            except JourneyTargetPending as error:
+                if not self.config.get("safety", {}).get("progress_fallbacks", False):
+                    raise
+                target_fallback_reason = str(error)
 
-        # 评分排序
-        ranked = self._rank_cards(card_texts, priority_keywords)
+        ranked = self._rank_cards(
+            [text if i in available else "" for i, text in enumerate(card_texts)], priority_keywords)
+        order = [item[0] for item in ranked]
+        order.extend(sorted((i for i in available if i not in order),
+                            key=lambda i: -self._extract_money(card_texts[i])))
+        policy = {"build_direction": build_direction, "priority_keywords": priority_keywords,
+                  "available_order": order, "fallback": "existing_money_score"}
+        for candidate in candidates:
+            candidate["keyword_rank"] = self._find_keyword_rank(candidate["text"], priority_keywords)
+            candidate["secondary_score"] = self._extract_money(candidate["text"])
+        self._record_options(ctx, screenshot, candidates, policy)
+        if target_fallback_reason and ctx.logger:
+            ctx.logger.log_fallback(
+                "target_card", target_fallback_reason, {"target": target},
+                {"slot": order[0], "text": card_texts[order[0]], "policy": policy}, candidates=candidates)
+        return self._choose_and_confirm(ctx, card_texts, candidates, order, policy)
 
-        if ranked:
-            best_slot = ranked[0][0]
-            reason = f"优先级匹配 (rank={ranked[0][1]})"
-            print(f"[卡片] {build_direction} → #{best_slot + 1} (评分最高)")
-        else:
-            best_slot = self._pick_richest(card_texts)
-            reason = "无匹配, 选金额最大"
-            print(f"[卡片] {build_direction} → #{best_slot + 1} (金额最大)")
+    @classmethod
+    def _candidates(cls, screenshot, texts):
+        height, width = screenshot.shape[:2]
+        candidates = []
+        for slot, text in enumerate(texts):
+            compact = re.sub(r"\s+", "", text or "")
+            blocked = next((label for label in ("达到上限", "达上限", "无法选择", "不可选择", "不能选择")
+                            if label in compact), None)
+            # The disabled card also has a solid red banner. Missing banner OCR
+            # must not turn it into an available choice.
+            x, _, rw, _ = cls.CARD_TEXT_REGIONS[slot]
+            banner = screenshot[int(height*.305):int(height*.355),
+                                int(width*(x+.015)):int(width*(x+rw-.015))]
+            if blocked is None and banner.size:
+                hsv = cv2.cvtColor(banner, cv2.COLOR_BGR2HSV)
+                red = (((hsv[:, :, 0] < 12) | (hsv[:, :, 0] > 170))
+                       & (hsv[:, :, 1] > 100) & (hsv[:, :, 2] > 90))
+                if np.mean(np.mean(red, axis=1) > .65) > .30:
+                    blocked = "不可选红色提示条"
+            if not compact:
+                blocked = blocked or "卡片文字未确认"
+            candidates.append({"slot": slot, "text": text, "enabled": blocked is None,
+                               "blocked_reason": blocked, "text_region": cls.CARD_TEXT_REGIONS[slot]})
+        return candidates
 
-        if ctx.logger:
-            ctx.logger.log_card_select(best_slot, reason, card_texts)
+    @classmethod
+    def _selected_slot(cls, screenshot):
+        if screenshot is None:
+            return None
+        height, width = screenshot.shape[:2]
+        hsv = cv2.cvtColor(screenshot, cv2.COLOR_BGR2HSV)
+        gold = ((hsv[:, :, 0] >= 12) & (hsv[:, :, 0] <= 40)
+                & (hsv[:, :, 1] >= 70) & (hsv[:, :, 2] >= 140))
+        selected = []
+        for slot, (center, _) in enumerate(cls.CARD_CLICK_POINTS):
+            strips = [gold[int(height*.23):int(height*.73),
+                           int(width*(edge-.013)):int(width*(edge+.013))]
+                      for edge in (center-.10, center+.10)]
+            if all(strip.size and np.mean(strip) > .08 for strip in strips):
+                selected.append(slot)
+        return selected[0] if len(selected) == 1 else None
 
-        # 点击卡片
-        cx, cy = self.CARD_CLICK_POINTS[best_slot]
-        ctx.controller.click_at_percent(cx, cy)
-        time.sleep(0.3)
+    @staticmethod
+    def _done_position(screenshot, ocr):
+        from .recognition import ScreenDetector
+        height, width = screenshot.shape[:2]
+        button = screenshot[int(height*.805):int(height*.855), int(width*.425):int(width*.575)]
+        if not button.size:
+            return None
+        hsv = cv2.cvtColor(button, cv2.COLOR_BGR2HSV)
+        blue = ((hsv[:, :, 0] >= 95) & (hsv[:, :, 0] <= 125)
+                & (hsv[:, :, 1] >= 100) & (hsv[:, :, 2] >= 110))
+        if np.mean(blue) < .30:
+            return None
+        return ScreenDetector(ocr).find_action_position(
+            screenshot, "选择完成", (.40, .79, .20, .09))
 
-        # 点击确认按钮
-        ctx.controller.click_at_percent(self.SELECT_DONE_X, self.SELECT_DONE_Y)
-        time.sleep(0.3)
+    def _record_options(self, ctx, screenshot, candidates, policy):
+        if getattr(ctx, "logger", None):
+            ctx.logger.begin_decision("card_select", ["0", "1", "2"])
+            for candidate in candidates:
+                ctx.logger.record_decision_frame(
+                    str(candidate["slot"]), f"奖励 {candidate['slot']+1}", screenshot,
+                    {**candidate, "policy": policy})
 
-        return True
+    def _select_available_slot(self, ctx, slot):
+        from .controller import InputTargetError
+        for attempt in range(2):
+            current = ctx.capture.capture_game()
+            if current is None:
+                raise InputTargetError("选卡截图失败")
+            if not self._is_card_select_title(_ocr_region(ctx.ocr, current, *self.TITLE_REGION)):
+                raise InputTargetError("选卡前页面已变化，停止旧坐标输入")
+            texts = [_ocr_region(ctx.ocr, current, *region) for region in self.CARD_TEXT_REGIONS]
+            if not self._candidates(current, texts)[slot]["enabled"]:
+                return None
+            selected = self._selected_slot(current)
+            if selected == slot:
+                position = self._done_position(current, ctx.ocr)
+                if position is not None:
+                    return current, position
+            else:
+                ctx.controller.click_at_percent(*self.CARD_CLICK_POINTS[slot])
+            for _ in range(5):
+                ctx.controller.wait(.25)
+                current = ctx.capture.capture_game()
+                if current is None:
+                    continue
+                if self._selected_slot(current) == slot:
+                    position = self._done_position(current, ctx.ocr)
+                    if position is not None:
+                        return current, position
+        return None
 
-    def _execute_target_card(self, ctx, texts, choice):
+    def _choose_and_confirm(self, ctx, texts, candidates, order, policy, choice=None):
         from .controller import InputTargetError
         from .recognition import ScreenDetector
         detector = ScreenDetector(ctx.ocr)
-        slot = choice['index']
-        if ctx.logger:
-            ctx.logger.log_card_select(slot, f"目标 {choice['combo_code']} 需要 {choice['material']}；"
-                                       f"角色={ctx.journey_target['character']}；目标版本={ctx.journey_target['revision']}", texts)
-        if ctx.target_selection_phase:
-            ctx.target_selection_phase('prepared', choice)
-        ctx.controller.click_at_percent(*self.CARD_CLICK_POINTS[slot])
-        ctx.controller.wait(0.3)
-        ctx.controller.click_at_percent(self.SELECT_DONE_X, self.SELECT_DONE_Y)
+        failures = []
+        for slot in order:
+            selection = self._select_available_slot(ctx, slot)
+            if selection is not None:
+                break
+            failures.append(slot)
+        else:
+            raise InputTargetError("可选奖励点击后均未确认选中，不再循环重试")
+        screenshot, position = selection
+        if getattr(ctx, "logger", None):
+            ctx.logger.record_decision_frame(None, "已选中奖励与可用确认按钮", screenshot,
+                                             {"slot": slot, "failed_slots": failures}, role="selected")
+            ctx.logger.log_card_select(slot, "排除不可选奖励后按配置排序", texts,
+                                      candidates=candidates, policy=policy, phase="confirming",
+                                      position=position)
+        ctx.controller.click_at_percent(*position)
         deadline = time.perf_counter() + 6
         while time.perf_counter() < deadline:
             ctx.controller.wait(0.4)
             current = ctx.capture.capture_game()
             if current is None:
                 continue
-            after = [_ocr_region(ctx.ocr, current, *region) for region in self.CARD_TEXT_REGIONS]
             title = _ocr_region(ctx.ocr, current, *self.TITLE_REGION)
             receipt = detector.read_region_text(current, 0.20, 0.10, 0.60, 0.75)
-            acknowledged = bool(detector.is_main_menu_screen(current)) or ('获得' in receipt and choice['material'] in receipt)
-            if after != texts and not self._is_card_select_title(title) and acknowledged:
-                if ctx.target_selection_phase:
-                    ctx.target_selection_phase('confirmed', choice)
+            acknowledged = bool(detector.is_main_menu_screen(current)) or (
+                "获得" in receipt and (choice["material"] in receipt if choice else "奖励" in receipt))
+            if not self._is_card_select_title(title) and acknowledged:
+                if getattr(ctx, "logger", None):
+                    ctx.logger.record_decision_frame(None, "奖励选择结果", current,
+                                                     {"slot": slot, "confirmed": True}, role="result")
+                    ctx.logger.log_card_select(slot, "已确认离开奖励选择页", texts,
+                                              candidates=candidates, policy=policy, phase="confirmed")
                 ctx.pending_screenshot = current
                 return True
-        raise InputTargetError('目标装备选择后界面未变化，请核对已有装备，不重复输入')
+        raise InputTargetError("奖励确认后未核验领取结果，不重复确认或更换卡片")
+
+    def _execute_target_card(self, ctx, texts, choice, *, screenshot=None, candidates=None):
+        if screenshot is None:
+            screenshot = ctx.capture.capture_game()
+        candidates = candidates or self._candidates(screenshot, texts)
+        if not candidates[choice["index"]]["enabled"]:
+            raise JourneyTargetPending("目标装备当前不可选，不能当作已获得")
+        policy = {"target": choice, "available_order": [choice["index"]]}
+        self._record_options(ctx, screenshot, candidates, policy)
+        callback = getattr(ctx, "target_selection_phase", None)
+        if callback:
+            callback("prepared", choice)
+        result = self._choose_and_confirm(ctx, texts, candidates, [choice["index"]], policy, choice=choice)
+        if result and callback:
+            callback("confirmed", choice)
+        return result
 
     def _get_priority_keywords(self, build_direction: str) -> list:
         """根据构建方向获取优先级关键词列表"""
@@ -3012,7 +3337,7 @@ class AppraisalHandler(Handler):
         if label == "评鉴战":
             # 首次打开虚空评鉴战会加载角色/奖励卡片，转场可能超过 6 秒。
             if not _wait_for_screen(ctx, "appraisal", timeout=12.0):
-                raise InputTargetError("评鉴战入口点击后未到达准备页，停止重复点击")
+                raise SceneTransitionError("评鉴战入口点击后未到达准备页，重新识别")
         else:
             deadline = time.perf_counter() + 6.0
             while time.perf_counter() < deadline:
@@ -3022,8 +3347,72 @@ class AppraisalHandler(Handler):
                     print("[评鉴战] 已接受，交由战斗处理器接管")
                     ctx.pending_screenshot = current
                     return True
-            raise InputTargetError("评鉴战接受后未离开准备页，停止重复点击")
+            raise SceneTransitionError("评鉴战接受后未离开准备页，重新识别")
         ctx.pending_screenshot = ctx.capture.capture_game()
+        return True
+
+
+class CombatHandler(Handler):
+    """Recognize active combat and request automatic combat at most once."""
+
+    AUTO_POSITION = (.830, .061)
+    TIMEOUT = 180
+
+    def __init__(self):
+        path = Path(__file__).resolve().parents[1] / "templates" / "battle_auto_off.png"
+        self._auto_off = cv2.imread(str(path)) if path.is_file() else None
+
+    @property
+    def priority(self): return 3
+
+    @property
+    def name(self): return "实际战斗"
+
+    def can_handle(self, frame, ocr_engine):
+        burst = frame.get_ocr(ocr_engine, .62, .84, .20, .11).upper()
+        wave = frame.get_ocr(ocr_engine, .025, .025, .12, .075)
+        if not re.search(r"\d+\s*/\s*\d+", wave):
+            return False
+        if "BURST" in burst:
+            return True
+        damage = frame.get_ocr(ocr_engine, .86, .13, .13, .14)
+        return "总伤害" in damage
+
+    def _auto_is_off(self, screenshot):
+        if self._auto_off is None or screenshot is None:
+            return False
+        normalized = cv2.resize(screenshot, (1600, 900), interpolation=cv2.INTER_AREA)
+        icon = normalized[30:85, 1298:1358]
+        score = cv2.matchTemplate(icon, self._auto_off, cv2.TM_CCOEFF_NORMED)[0, 0]
+        difference = np.abs(icon.astype(float) - self._auto_off.astype(float)).mean()
+        return bool(score >= .96 and difference < 8)
+
+    def handle(self, ctx):
+        from .controller import InputTargetError
+        screenshot = ctx.capture.capture_game()
+        if screenshot is None or not self.can_handle(FrameContext(screenshot), ctx.ocr):
+            return False
+        started = getattr(ctx, "battle_started_at", None)
+        if started is None:
+            started = ctx.battle_started_at = time.monotonic()
+        sample = cv2.resize(screenshot, (64, 36), interpolation=cv2.INTER_AREA)
+        previous = getattr(ctx, "battle_progress_frame", None)
+        last_progress = getattr(ctx, "battle_last_progress_at", started)
+        if previous is not None and np.abs(sample.astype(float) - previous.astype(float)).mean() > 2:
+            last_progress = ctx.battle_last_progress_at = time.monotonic()
+        ctx.battle_progress_frame = sample
+        if time.monotonic() - last_progress > self.TIMEOUT:
+            raise SceneTransitionError("战斗画面长时间无进展，重新识别；不反复切换自动按钮")
+        if self._auto_is_off(screenshot) and not getattr(ctx, "battle_auto_requested", False):
+            if ctx.logger:
+                ctx.logger.begin_decision("battle_auto", [])
+                ctx.logger.record_decision_frame(None, "自动战斗开启前", screenshot,
+                                                 {"auto_icon": "off"}, role="state")
+                ctx.logger.log_battle_choice("auto", None, self.AUTO_POSITION,
+                                             reason="verified_auto_off_icon")
+            ctx.controller.click_at_percent(*self.AUTO_POSITION)
+            ctx.battle_auto_requested = True
+        ctx.controller.wait(1.0)
         return True
 
 
@@ -3095,13 +3484,15 @@ class CommissionHandler(Handler):
     EXIT_COMMISSION_Y = 0.92
 
     # 默认 RANK 差阈值 (可配置)
-    DEFAULT_RANK_THRESHOLD = 5
+    DEFAULT_RANK_THRESHOLD = 4
 
     def __init__(self, config=None):
         self.config = config or {}
         cc = self.config.get("commission", {})
         self.rank_threshold = cc.get("rank_threshold", self.DEFAULT_RANK_THRESHOLD)
         self.enabled = cc.get("enabled", True)
+        self.single_tier_emergency_battle = cc.get("single_tier_emergency_battle", False)
+        self.progress_fallbacks = self.config.get("safety", {}).get("progress_fallbacks", False)
 
     @property
     def priority(self): return 4
@@ -3112,9 +3503,22 @@ class CommissionHandler(Handler):
     def can_handle(self, frame: FrameContext, ocr_engine) -> bool:
         if not self.enabled:
             return False
+        if (self.single_tier_emergency_battle and frame.screenshot is not None
+                and self._is_commission_trade_menu(frame.screenshot, ocr_engine)):
+            return True
         return self._is_commission_screen(frame, ocr_engine)
 
     def handle(self, ctx: HandlerContext) -> bool:
+        if self.single_tier_emergency_battle:
+            screenshot = ctx.capture.capture_game()
+            if screenshot is None:
+                return False
+            entry = self._commission_trade_entry(screenshot, ctx.ocr)
+            if entry is not None:
+                ctx.controller.click_at_percent(*entry)
+                current, _ = self._wait_panel(ctx)
+                ctx.pending_screenshot = current
+                return True
         return self._handle_commission_screen(ctx)
 
     # ===================== 委托界面处理 =====================
@@ -3122,7 +3526,11 @@ class CommissionHandler(Handler):
     def _is_commission_screen(self, frame, ocr_engine) -> bool:
         result = self._is_commission_screen_raw(frame.screenshot, ocr_engine)
         if not result:
-            return False
+            column = frame.get_ocr(ocr_engine, .78, .29, .20, .39)
+            if not all(tier + "委托" in re.sub(r"\s+", "", column) for tier in TIERS):
+                return False
+            height, width = frame.screenshot.shape[:2]
+            return read_panel(frame.recognize_full(ocr_engine), width, height)["my_rank"] is not None
         # 检测 "建议综合等级" 标签 (委托详情页独有)
         for rx, ry, rw, rh in self.RECOMMENDED_LABEL_REGIONS:
             text = frame.get_ocr(ocr_engine, rx, ry, rw, rh)
@@ -3135,7 +3543,11 @@ class CommissionHandler(Handler):
             for tier in ["低阶", "中阶", "高阶"]:
                 if tier in text:
                     tiers_found.add(tier)
-        return len(tiers_found) >= 2
+        if len(tiers_found) >= 2:
+            return True
+        height, width = frame.screenshot.shape[:2]
+        panel = read_panel(frame.recognize_full(ocr_engine), width, height)
+        return panel["my_rank"] is not None and set(panel["tier_positions"]) == set(TIERS)
 
     def _is_commission_screen_raw(self, screenshot, ocr_engine) -> bool:
         """宽松检测: 是否有委托相关文字"""
@@ -3146,70 +3558,221 @@ class CommissionHandler(Handler):
         return False
 
     def _handle_commission_screen(self, ctx: HandlerContext) -> bool:
-        """处理委托界面: 读RANK → 逐级尝试 → 执行"""
-        print("[委托] 进入")
+        """Collect every tier, record the comparison, then accept one verified tier."""
+        from .controller import InputTargetError
+        screenshot, initial = self._initial_panel(ctx)
+        if initial is None:
+            return False
+        tiers = (initial["tier"],) if initial.get("single_tier_emergency") else TIERS
+        if set(initial["tier_positions"]) != set(tiers):
+            raise InputTargetError("未确认完整委托入口，候选证据不完整")
+        if ctx.logger:
+            ctx.logger.begin_decision("commission", tiers)
+            ctx.logger.record_decision_frame(None, "委托列表", screenshot, initial, role="state")
+        candidates = []
+        panel = initial
+        for tier in tiers:
+            if panel["tier"] != tier:
+                ctx.controller.click_at_percent(*self.TIER_CLICK_POINTS[tier])
+            screenshot, panel = self._wait_panel(ctx, tier)
+            if panel["my_rank"] != initial["my_rank"]:
+                raise InputTargetError("比较委托期间我方等级变化，停止选择")
+            if initial.get("single_tier_emergency") and (
+                    not panel.get("single_tier_emergency")
+                    or not same_commission(panel["title"], initial["title"])):
+                raise InputTargetError("紧急委托列表发生变化，停止选择")
+            candidate = {**panel, "verified": True,
+                         "gap": panel["recommended"] - panel["my_rank"],
+                         "mode": battle_mode(panel["my_rank"], panel["recommended"], self.rank_threshold)}
+            candidate["eligible"] = candidate["mode"] is not None
+            candidates.append(candidate)
+            if ctx.logger:
+                ctx.logger.record_decision_frame(tier, tier + "委托", screenshot, candidate)
+        selected = select_commission(candidates, self.rank_threshold)
+        policy = {"max_rank_gap": min(4, self.rank_threshold), "skip_max_gap": 2,
+                  "order": "highest_recommended_rank_then_tier",
+                  "single_tier_emergency_battle": self.single_tier_emergency_battle,
+                  "no_eligible_tier": "lowest_rank_battle" if self.progress_fallbacks else "leave"}
+        reason = "highest_eligible_rank"
+        if (selected is None and initial.get("single_tier_emergency")
+                and self.single_tier_emergency_battle and len(candidates) == 1):
+            selected = candidates[0]
+            selected["mode"] = "battle"
+            selected["policy_exception"] = "single_tier_emergency_progress"
+            reason = selected["policy_exception"]
+        elif selected is None and self.progress_fallbacks and candidates:
+            selected = min(candidates, key=lambda row: (row["recommended"], -TIERS.index(row["tier"])))
+            selected["mode"] = "battle"
+            selected["policy_exception"] = "no_eligible_tier_lowest_rank_battle"
+            reason = selected["policy_exception"]
+        if selected is None:
+            if ctx.logger:
+                ctx.logger.log_commission(None, initial["my_rank"], None, candidates=candidates,
+                                          policy=policy, reason="no_eligible_tier")
+            self._exit_commission(ctx)
+            if initial.get("single_tier_emergency"):
+                raise InputTargetError(
+                    f"单项紧急委托超出等级策略：我方RANK{initial['my_rank']}，"
+                    f"建议RANK{initial['recommended']}，无可降档项；已返回菜单，等待策略确认")
+            return True
+        if panel["tier"] != selected["tier"]:
+            ctx.controller.click_at_percent(*self.TIER_CLICK_POINTS[selected["tier"]])
+        screenshot, confirmed = self._wait_panel(ctx, selected["tier"])
+        if (not same_commission(confirmed["title"], selected["title"])
+                or any(confirmed[key] != selected[key] for key in ("my_rank", "recommended"))):
+            raise InputTargetError("委托选择后的等级或标题变化，未接受")
+        if len(confirmed["accept_positions"]) != 1:
+            raise InputTargetError("未唯一定位委托接受按钮")
+        if ctx.logger:
+            ctx.logger.record_decision_frame(None, "最终委托", screenshot, confirmed, role="selected")
+            if selected.get("policy_exception"):
+                ctx.logger.log_fallback(
+                    "commission", "无符合等级差规则的委托，按推进优先选择最低建议等级并实际战斗",
+                    policy, {"tier": selected["tier"], "my_rank": selected["my_rank"],
+                             "recommended": selected["recommended"], "mode": "battle",
+                             "exception": reason}, candidates=candidates)
+            ctx.logger.log_commission(selected["tier"], selected["my_rank"], selected["recommended"],
+                                      candidates=candidates, mode=selected["mode"], policy=policy,
+                                      reason=reason)
+        print(f"[委托] {selected['tier']} 我方RANK{selected['my_rank']} / "
+              f"建议RANK{selected['recommended']}，{selected['mode']}")
+        ctx.controller.click_at_percent(*confirmed["accept_positions"][0])
+        return self._choose_battle(ctx, selected)
 
-        # 读取当前 RANK
+    def _initial_panel(self, ctx):
+        from .controller import InputTargetError
         screenshot = ctx.capture.capture_game()
         if screenshot is None:
-            return False
+            raise SceneTransitionError("委托列表截图失败")
+        height, width = screenshot.shape[:2]
+        items = self._panel_items(screenshot, ctx.ocr)
+        panel = read_panel(items, width, height)
+        if (panel["my_rank"] is None and panel["title"] is None
+                and not panel["tier_positions"]):
+            # A pending frame may precede the battle transition. Hand the fresh
+            # page back to dispatch without repeating any commission input.
+            ctx.pending_screenshot = screenshot
+            return screenshot, None
+        if (all(panel[key] is None for key in ("title", "tier", "recommended"))
+                and panel["my_rank"] is not None and set(panel["tier_positions"]) == set(TIERS)
+                and read_battle_prompt(items, width, height) is None):
+            ctx.controller.click_at_percent(*self.TIER_CLICK_POINTS["高阶"])
+            return self._wait_panel(ctx, "高阶")
+        return self._wait_panel(ctx)
 
-        my_rank = self._read_rank(screenshot, ctx.ocr)
-        if my_rank is None:
-            print("[委托] 无法读RANK, 退出")
-            self._exit_commission(ctx)
-            return True
-
-        print(f"[委托] RANK={my_rank}")
-
-        # 按 高阶 → 中阶 → 低阶 尝试
-        tier_order = ["高阶", "中阶", "低阶"]
-        for tier_name in tier_order:
-            click_x, click_y = self.TIER_CLICK_POINTS[tier_name]
-
-            ctx.controller.click_at_percent(click_x, click_y)
-            time.sleep(0.3)
-
+    def _wait_panel(self, ctx, tier=None):
+        from .controller import InputTargetError
+        previous = None
+        missing = ["screenshot"]
+        for _ in range(5):
+            ctx.controller.wait(.15)
             screenshot = ctx.capture.capture_game()
             if screenshot is None:
                 continue
+            height, width = screenshot.shape[:2]
+            panel = read_panel(self._panel_items(screenshot, ctx.ocr), width, height)
+            missing = [key for key in ("title", "tier", "my_rank", "recommended") if panel[key] is None]
+            name = panel["title"].partition("讨伐委托")[0] if panel["title"] else None
+            signature = (name, panel["tier"], panel["my_rank"], panel["recommended"],
+                         tuple(sorted(panel["tier_positions"])), panel["single_tier_emergency"])
+            valid = all(value is not None for value in signature) and (tier is None or panel["tier"] == tier)
+            if valid and signature == previous:
+                return screenshot, panel
+            previous = signature if valid else None
+        raise SceneTransitionError(f"未稳定确认{tier or ''}委托详情，重新识别；未确认字段={','.join(missing) or '连续帧或阶数'}")
 
-            recommended = self._read_recommended_level(screenshot, ctx.ocr)
-            if recommended is None:
-                print(f"[委托] {tier_name}: 无建议等级, 跳过")
+    @staticmethod
+    def _panel_items(screenshot, ocr):
+        """Re-read the small gold title at native resolution, retaining the gate."""
+        height, width = screenshot.shape[:2]
+        items = list(ocr.recognize_detailed(screenshot))
+        left, top, right, bottom = int(width*.50), int(height*.26), int(width*.75), int(height*.325)
+        titles = []
+        for text, confidence, box in ocr.recognize_detailed(screenshot[top:bottom, left:right]):
+            if box is None or confidence < .80 or "讨伐委托" not in re.sub(r"\s+", "", text):
                 continue
+            points = np.asarray(box, dtype=float)
+            if points.shape == (4, 2) and np.isfinite(points).all():
+                titles.append((text, confidence, (points + [left, top]).tolist()))
+        if titles:
+            retained = []
+            for item in items:
+                box = item[2] if len(item) > 2 else None
+                if box is not None:
+                    points = np.asarray(box, dtype=float)
+                    if points.shape == (4, 2):
+                        x, y = points.mean(axis=0)
+                        if left <= x <= right and top <= y <= bottom:
+                            continue
+                retained.append(item)
+            return retained + titles
+        return items
 
-            diff = recommended - my_rank
-            can_do = my_rank >= recommended - self.rank_threshold
-            print(f"[委托] {tier_name} 建议RANK{recommended} diff={diff} {'→ 执行' if can_do else '→ 跳过'}")
-
-            if can_do:
-                ctx.controller.click_at_percent(
-                    self.CHALLENGE_BTN_X, self.CHALLENGE_BTN_Y)
-                time.sleep(0.5)
-
-                self._try_skip_battle(ctx)
-
-                ctx.controller.click_center_multi(count=5, interval=0.01, click_delay=0.01)
-                time.sleep(0.5)
-
-                ctx.controller.click_at_percent(
-                    self.COMMISSION_DONE_X, self.COMMISSION_DONE_Y)
-                time.sleep(0.5)
-
-                return True
-
-        print("[委托] 全部不满足, 退出")
-        self._exit_commission(ctx)
-        return True
+    def _choose_battle(self, ctx, selected):
+        from .controller import InputTargetError
+        previous = None
+        for _ in range(8):
+            ctx.controller.wait(.2)
+            screenshot = ctx.capture.capture_game()
+            if screenshot is None:
+                continue
+            height, width = screenshot.shape[:2]
+            prompt = read_battle_prompt(ctx.ocr.recognize_detailed(screenshot), width, height)
+            if not prompt:
+                previous = None
+                continue
+            if (not prompt["commission"] or not same_commission(prompt["title"], selected["title"])
+                    or prompt["recommended"] != selected["recommended"]
+                    or prompt["recommendation_ambiguous"]):
+                raise InputTargetError("委托确认页与已选择委托不一致，未开始战斗")
+            signature = (prompt["title"], prompt["recommended"], prompt["recommendation"])
+            if signature != previous:
+                previous = signature
+                continue
+            mode = "battle" if prompt["recommendation"] == "battle" else selected["mode"]
+            reason = "ui_recommends_battle" if mode != selected["mode"] else "rank_gap_policy"
+            if ctx.logger:
+                ctx.logger.record_decision_frame(None, "委托战斗方式", screenshot, prompt, role="confirmation")
+                ctx.logger.log_battle_choice(mode, prompt["recommendation"], prompt[mode + "_position"],
+                                             reason=reason, commission=True)
+            ctx.controller.click_at_percent(*prompt[mode + "_position"])
+            if mode == "battle":
+                ctx.battle_auto_requested = False
+                ctx.battle_started_at = time.monotonic()
+            ctx.controller.wait(.4)
+            ctx.pending_screenshot = None
+            return True
+        raise SceneTransitionError("委托接受后未确认战斗选择页，重新识别")
 
     def _exit_commission(self, ctx: HandlerContext):
         """退出委托界面"""
         ctx.controller.send_escape()
-        time.sleep(0.1)
-        ctx.controller.click_center_multi(count=5, interval=0.01, click_delay=0.01)
-        _wait_for_screen(ctx, "main_menu", timeout=3.0)
+        if not _wait_for_screen(ctx, "main_menu", timeout=3.0):
+            screenshot = ctx.capture.capture_game()
+            if screenshot is None or not self._is_commission_trade_menu(screenshot, ctx.ocr):
+                from .controller import InputTargetError
+                raise InputTargetError("委托退出后未确认主菜单")
+            ctx.pending_screenshot = screenshot
+            return
         ctx.pending_screenshot = ctx.capture.capture_game()
+
+    @staticmethod
+    def _is_commission_trade_menu(screenshot, ocr):
+        return CommissionHandler._commission_trade_entry(screenshot, ocr) is not None
+
+    @staticmethod
+    def _commission_trade_entry(screenshot, ocr):
+        height, width = screenshot.shape[:2]
+        rows = normalized_rows(ocr.recognize_detailed(screenshot), width, height)
+        ranks = [row for row in rows if re.fullmatch(r"RANK\d{1,2}", row["text"], re.I)
+                 and inside(row, (.035, .27, .15, .10))]
+        buttons = [row for row in rows
+                  if inside(row, (.86, .40, .07, .20)) and row["text"] in {"委托", "交易"}]
+        if len(ranks) != 1 or sorted(row["text"] for row in buttons) != ["交易", "委托"]:
+            return None
+        # The verified label's diamond icon is the clickable entry, as on
+        # the appraisal menu; the label itself can ignore clicks.
+        return .941, next(row["y"] for row in buttons if row["text"] == "委托")
 
     # ===================== 跳过战斗 =====================
 
@@ -3578,6 +4141,9 @@ class ShopHandler(Handler):
 
     def can_handle(self, frame: FrameContext, ocr_engine) -> bool:
         if not self.enabled:
+            return False
+        if (self.config.get("commission", {}).get("single_tier_emergency_battle", False)
+                and CommissionHandler._is_commission_trade_menu(frame.screenshot, ocr_engine)):
             return False
 
         from .recognition import ScreenDetector
@@ -4349,7 +4915,7 @@ class JourneyTransitionHandler(Handler):
     def can_handle(self, frame, ocr_engine):
         text = re.sub(r"\s+", "", " ".join(
             item[0] for item in frame.recognize_full(ocr_engine)))
-        if "达成目标" in text and "点击以继续" in text:
+        if any(title in text for title in ("达成目标", "旅程目标达成")) and "点击以继续" in text:
             return True
         # 新目标卡片位于中央下方。右上角有 HUD 的普通主菜单不能命中。
         center = frame.get_ocr(ocr_engine, 0.30, 0.73, 0.40, 0.19)
@@ -4720,7 +5286,7 @@ class UnknownHandler(Handler):
         # 轮询时也检查已实现的中途结果层；只交还调度，不在未知处理器发送输入。
         if any(handler.can_handle(frame, ocr_engine) for handler in (
                 InventoryHandler(), TrainingResultHandler(), AttributeGainHandler(), RewardAdvanceHandler(),
-                JourneyTransitionHandler(), StoryResultHandler())):
+                JourneyTransitionHandler(), StoryResultHandler(), CombatHandler(), BattleLeaveHandler())):
             return True
         # 加载转为剧情时退出中心连点，让剧情跳过处理器使用顶部图标。
         if detector.find_story_skip(screenshot) and detector.is_story_dialogue(screenshot):

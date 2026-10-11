@@ -8,7 +8,7 @@ game:
   window_title: "StarSavior"        # 游戏窗口标题（部分匹配即可）
   windowed_mode: true               # 是否窗口模式（建议开启）
 
-# 只有本地快查中已核对的事件才自动选择；未知事件停在选项页，不盲选或逐项试点。
+# 优先已核对事件规则；开启 progress_fallbacks 后，对明确可用选项保底并记录偏离。
 events:
   require_document_effects: true
   reference_document: "https://docs.qq.com/sheet/DZkh2QmxKdnJUaVpw?tab=6chp1"
@@ -163,6 +163,8 @@ operation:
 
 # ------------------------ 保护机制 ----------------------------
 safety:
+  progress_fallbacks: true         # 可识别的业务选项无合规解时保底推进，记录规则偏离
+  auto_recovery_attempts: 2        # 截图/转场故障重新绑定并识别；同一故障不无限重试
   max_runtime_minutes: 45          # 单次跑马最大时长 (分钟), 超时自动暂停并触发AI分析
   stuck_threshold: 5               # 连续 N 轮 UnknownHandler → 视为卡死, 暂停分析
   round_timeout_seconds: 60        # 同一轮次超过此秒数 → 视为卡死, 暂停分析
@@ -255,7 +257,8 @@ move_platform:
 # ------------------------ 讨伐委托 ----------------------------
 commission:
   enabled: true                      # 是否启用自动讨伐委托
-  rank_threshold: 5                  # RANK差阈值: 当前RANK不低于(建议等级-阈值)则执行
+  rank_threshold: 4                  # 建议RANK最多高出我方4级；高出至多2级可跳过，3-4级实际战斗
+  single_tier_emergency_battle: true # 单项紧急委托无低档可选时实际战斗，不因等级差停滞
 
 # ------------------------ 商店/交易 ----------------------------
 shop:

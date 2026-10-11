@@ -23,6 +23,7 @@ import json
 import sys
 import time
 import re
+from dataclasses import replace
 from pathlib import Path
 from typing import Optional
 
@@ -30,7 +31,7 @@ import cv2
 import numpy as np
 
 from .capture import ScreenCapture
-from .controller import Controller, InputTargetError
+from .controller import Controller, InputTargetError, SceneTransitionError
 from .journey_target import JourneyTargetPending
 from .recognition import GameUI, OCREngine, GameStateReader, ScreenDetector
 from .decision import DecisionEngine, TrainingOption, GameState
@@ -75,6 +76,7 @@ from .handlers import (
     JourneyTransitionHandler,
     MainMenuHandler,
     AppraisalHandler,
+    CombatHandler,
     UnknownHandler,
     preload_profiles,
 )
@@ -234,7 +236,7 @@ class Trainer(RuntimeSession):
         self.controller = Controller(
             click_delay=op_cfg.get("click_delay", 0.5),
             action_interval=op_cfg.get("action_interval", 1.0),
-            auto_refocus=development_mode,
+            auto_refocus=True,
         )
         self.ui = GameUI(self.capture, config)
         self.engine = DecisionEngine(config)
@@ -266,11 +268,12 @@ class Trainer(RuntimeSession):
 
         # 构建处理器链
         self._handlers = HandlerChain([
-            SkipHandler(),
+            SkipHandler(config),
             InventoryHandler(),
             BattleDefeatHandler(),
             StoryResultHandler(),
             AppraisalHandler(),
+            CombatHandler(),
             BattleLeaveHandler(),
             CampSelectHandler(),
             MovePlatformHandler(config),
@@ -414,11 +417,12 @@ class Trainer(RuntimeSession):
                     self._close_interrupted_turn()
                     if self._stop_requested:
                         break
-                    if not self._paused:
+                    if not self._paused and not self._try_auto_recovery(error):
                         self._enter_safe_pause(error.reason)
                 except (EventDecisionPending, InputTargetError, SafePauseError, JourneyTargetPending) as error:
                     self._close_interrupted_turn()
-                    self._enter_safe_pause(type(error).__name__, error=str(error))
+                    if not self._try_auto_recovery(error):
+                        self._enter_safe_pause(type(error).__name__, error=str(error))
                 except Exception as error:
                     self._close_interrupted_turn()
                     self._enter_safe_pause("runtime_exception", error=f"{type(error).__name__}: {error}")
@@ -452,13 +456,14 @@ class Trainer(RuntimeSession):
     def _do_round(self) -> bool:
         """Recognize the current page on every dispatch; old handler stacks are never resumed."""
         self._runtime_poll()
+        self.logger.clear_decision()
         self._refresh_journey_target()
         screenshot = self._handler_ctx.pending_screenshot
         self._handler_ctx.pending_screenshot = None
         if screenshot is None:
             screenshot = self.capture.capture_game()
         if screenshot is None:
-            raise SafePauseError("截屏失败")
+            raise SceneTransitionError("截屏失败")
         self.logger.set_screenshot(screenshot)
         self._on_runtime_frame(screenshot)
         self._write_checkpoint("frame_captured", screenshot=screenshot)
@@ -545,6 +550,8 @@ class Trainer(RuntimeSession):
         self._handler_ctx.try_detect_turn()
 
         # 读取游戏状态
+        state_cache = {key: getattr(self, key, None)
+                       for key in ("_last_stamina", "_last_mood", "_last_money")}
         state = self._read_game_state(screenshot)
 
         # 开始回合日志
@@ -555,6 +562,13 @@ class Trainer(RuntimeSession):
             mood=state.mood,
             money=state.money,
         )
+        self.logger.begin_decision("training", [str(i) for i in range(5)])
+        self.logger.record_decision_frame(None, "训练状态", screenshot, {
+            "state": vars(state), "detected_turn": self._handler_ctx.detected_turn,
+            "state_source": "decision_reader_with_cache",
+            "cache_inputs": state_cache,
+            "scan_mode": self._scan_mode,
+        }, role="state")
 
         if self.engine.is_rule_engine_mode:
             action, target = self._decide_rule_engine(state)
@@ -566,6 +580,8 @@ class Trainer(RuntimeSession):
                 self.logger.end_turn()
                 return False
             action, target = self.engine.make_decision(options, state, debug=True)
+            self.logger.log_decision_traditional(
+                options, state, target if action == "train" else None, action=action)
 
         if action == "train":
             result = self._execute_train(target)
@@ -608,6 +624,7 @@ class Trainer(RuntimeSession):
         profile_name = self.engine.rule_profile_name
         scan_state = TrainingMetricScanState()
         scan_state.stamina_bar_pct = state.stamina
+        scan_state._advantage_multiplier = self._advantage_multiplier
 
         # 构建当前属性快照 (用于评分降权)
         current_stats = {
@@ -619,6 +636,12 @@ class Trainer(RuntimeSession):
         ctx_kwargs = dict(target_stats=target_stats, current_stats=current_stats)
 
         self._try_read_stats(scan_state)
+        # Every selectable training row must have its own source image before
+        # the rule engine decides; inferred unvisited rows are not visual proof.
+        self._focus_read_metrics(scan_state)
+        ctx_kwargs["current_stats"] = {
+            "力量": scan_state.strength_stat, "体力": scan_state.stamina_stat,
+            "韧性": None, "专注": None, "保护": None}
 
         # 优势训练标记会影响所有训练行的权重。若画面上存在大拇指，
         # 先把五行指标补齐，避免 speed.json 的旧图标阈值规则在尚未读取
@@ -638,7 +661,7 @@ class Trainer(RuntimeSession):
         if turn is not None and turn <= icon_priority_limit:
             icon_result = self._early_icon_priority(scan_state, turn, state.mood)
             if icon_result is not None:
-                return self._apply_camp_strategy(icon_result, scan_state, turn, state)
+                return self._finish_training_decision(icon_result, scan_state, turn, state)
 
         for iteration in range(10):
             context = scan_state.to_decision_context(
@@ -656,10 +679,9 @@ class Trainer(RuntimeSession):
                 }
                 context = scan_state.to_decision_context(
                     profile, profile_name, self.engine.adventure_gain_threshold, **ctx_kwargs)
-                self.logger.log_decision_rule_engine(result, context, scan_state)
-                if result.action == TrainingDecisionAction.REST:
-                    return self._apply_camp_strategy(("rest", result), scan_state, turn, state)
-                return self._apply_camp_strategy(("train", result), scan_state, turn, state)
+                return self._finish_training_decision(
+                    ("rest" if result.action == TrainingDecisionAction.REST else "train", result),
+                    scan_state, turn, state)
 
             if probe.missing_field is None:
                 break
@@ -682,11 +704,27 @@ class Trainer(RuntimeSession):
         result = TrainingRuleEngine.evaluate(context, profile)
         print(f"[规则] {result.action.value} row={result.target_row_index}")
 
-        self.logger.log_decision_rule_engine(result, context, scan_state)
+        return self._finish_training_decision(
+            ("rest" if result.action == TrainingDecisionAction.REST else "train", result),
+            scan_state, turn, state)
 
-        if result.action == TrainingDecisionAction.REST:
-            return self._apply_camp_strategy(("rest", result), scan_state, turn, state)
-        return self._apply_camp_strategy(("train", result), scan_state, turn, state)
+    def _finish_training_decision(self, decision, scan_state, turn, state):
+        base_result = replace(decision[1])
+        final = self._apply_camp_strategy(decision, scan_state, turn, state)
+        context = scan_state.to_decision_context(
+            self.engine.rule_profile, self.engine.rule_profile_name,
+            self.engine.adventure_gain_threshold,
+            target_stats=getattr(self, "_target_stats", {}),
+            current_stats={"力量": scan_state.strength_stat, "体力": scan_state.stamina_stat,
+                           "韧性": None, "专注": None, "保护": None})
+        if final[0] == "train" and final[1].target_row_index is None:
+            final[1].target_row_index = TrainingRuleEngine._score_training_rows(context)
+        self.logger.log_decision_rule_engine(
+            final[1], context, scan_state, base_result=base_result,
+            overrides={"game_turn": turn, "mood": state.mood,
+                       "final_action": final[0], "base_action": decision[0],
+                       "camp_configuration": self.config.get("camp", {})})
+        return final
 
     def _apply_camp_strategy(self, decision, scan_state, turn, state):
         """合宿策略: 25-29回合预合宿蓄力, 30+合宿激进训练(条件性).
@@ -780,7 +818,13 @@ class Trainer(RuntimeSession):
                 parts.append(f"{name}={val}" if val is not None else f"{name}=N/A")
             print(f"[属性] {' '.join(parts)}")
         except Exception:
-            pass
+            return
+        logger = getattr(self, "logger", None)
+        if logger is not None:
+            logger.record_decision_frame(None, "属性与训练标记", screenshot, {
+                "stats": all_stats, "flash_training": scan_state.is_flash,
+                "advantage_training": scan_state.is_advantage,
+            }, role="state")
 
     def _early_icon_priority(self, scan_state: TrainingMetricScanState, turn: int, mood: str):
         """前N回合: 全扫描5行找图标最多的训练, 优先训练以增加支援卡羁绊.
@@ -822,24 +866,9 @@ class Trainer(RuntimeSession):
 
         row_name = _TRAINING_ROWS[best_row][0]
         print(f"[羁绊] T{turn} {row_name}: {best_icons}图标 → 优先训练")
-        self.logger.log_decision_rule_engine(
-            TrainingDecisionResult(
-                action=TrainingDecisionAction.TRAIN,
-                target_row_index=best_row,
-                matched_rule_id="early_icon_priority",
-            ),
-            scan_state.to_decision_context(
-                self.engine.rule_profile, self.engine.rule_profile_name,
-                self.engine.adventure_gain_threshold,
-                target_stats=getattr(self, '_target_stats', {}),
-                current_stats={
-                    "力量": scan_state.strength_stat,
-                    "体力": scan_state.stamina_stat,
-                }),
-            scan_state,
-        )
         return ("train", TrainingDecisionResult(
-            action=TrainingDecisionAction.TRAIN,
+            action=(TrainingDecisionAction.TRAIN_BEST_GAIN if any(scan_state.is_advantage)
+                    else TrainingDecisionAction.TRAIN_MOST_ICONS),
             target_row_index=best_row,
             matched_rule_id="early_icon_priority",
         ))
@@ -990,7 +1019,8 @@ class Trainer(RuntimeSession):
         return result
 
     def _read_row_metrics(self, scan_state: TrainingMetricScanState, row_index: int):
-        if scan_state.has_icon_count(row_index) and scan_state.has_fail_rate(row_index):
+        if (scan_state.has_icon_count(row_index) and scan_state.has_fail_rate(row_index)
+                and scan_state.has_gain(row_index)):
             return
 
         name, rx, ry = _TRAINING_ROWS[row_index]
@@ -1001,21 +1031,24 @@ class Trainer(RuntimeSession):
 
         screenshot = self.capture.capture_game()
         if screenshot is None:
-            scan_state.set_row_metrics(row_index, 0, UNKNOWN_FAIL_RATE_FALLBACK)
-            return
+            raise SafePauseError("训练候选截图失败，不能生成完整决策证据")
 
         h, w = screenshot.shape[:2]
 
         icon_count = 3
+        icon_source = "configured_default"
         if self.engine.use_icon_counting:
             try:
                 icon_count = count_circular_icons(screenshot, name)
+                icon_source = "image_detection"
             except Exception:
                 pass
 
         fail_rate = UNKNOWN_FAIL_RATE_FALLBACK
         stamina_pct = self._last_stamina if self._last_stamina is not None else 100
         stamina_fallback = max(0, 100 - int(stamina_pct))
+        fail_source = "stamina_fallback"
+        fail_reads = []
 
         if self.engine.use_per_row_fail_rate:
             regions = self.engine.fail_rate_regions
@@ -1035,7 +1068,10 @@ class Trainer(RuntimeSession):
                     fail_roi = screenshot[py:py + ph, px:px + pw]
                     texts = self.ui.ocr.recognize(fail_roi)
                     ocr_texts = [t[0] for t in texts]
+                    fail_reads.append({"method": "ocr", "text": ocr_texts})
                     fail_rate = parse_fail_rate_from_ocr_texts(ocr_texts)
+                    if fail_rate < UNKNOWN_FAIL_RATE_FALLBACK:
+                        fail_source = "ocr"
             except Exception:
                 pass
 
@@ -1056,9 +1092,11 @@ class Trainer(RuntimeSession):
                             enhanced_bgr = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2BGR)
                             texts = self.ui.ocr.recognize(enhanced_bgr)
                             ocr_texts2 = [t[0] for t in texts]
+                            fail_reads.append({"method": "red_channel_ocr", "text": ocr_texts2})
                             fail_rate2 = parse_fail_rate_from_ocr_texts(ocr_texts2)
                             if fail_rate2 < UNKNOWN_FAIL_RATE_FALLBACK:
                                 fail_rate = fail_rate2
+                                fail_source = "red_channel_ocr"
                 except Exception:
                     pass
 
@@ -1067,7 +1105,10 @@ class Trainer(RuntimeSession):
                 try:
                     win_text = self.ui.ocr.recognize_region(screenshot, rrx, rry, rrw, rrh)
                     if win_text:
+                        fail_reads.append({"method": "region_ocr", "text": [win_text]})
                         fail_rate = parse_fail_rate_from_ocr_texts([win_text])
+                        if fail_rate < UNKNOWN_FAIL_RATE_FALLBACK:
+                            fail_source = "region_ocr"
                 except Exception:
                     pass
 
@@ -1080,16 +1121,30 @@ class Trainer(RuntimeSession):
         # +N 徽标位于属性面板右侧，属性名、当前值和徽标是独立 OCR 框。
         # 按属性所在行裁剪，避免把副属性/潜质点数的增益当成主属性增益。
         gain = 0
+        gain_text = ""
+        gain_source = "unread_default"
         try:
             gain_text = self.ui.ocr.recognize_region(
                 screenshot, 0.164, 0.365 + row_index * 0.0694, 0.05, 0.043)
             m = re.search(r'[+＋]\s*(\d{1,3})(?!\d)', gain_text)
             if m:
                 gain = int(m.group(1))
+                gain_source = "ocr"
         except Exception:
             pass
 
-        scan_state.set_row_metrics(row_index, icon_count, fail_rate, gain)
+        scan_state.set_row_metrics(row_index, icon_count, fail_rate, gain,
+                                   is_flash=scan_state.is_flash[row_index])
+        logger = getattr(self, "logger", None)
+        if logger is not None:
+            logger.record_decision_frame(str(row_index), name, screenshot, {
+                "row_index": row_index, "icons": icon_count, "fail_rate": fail_rate, "gain": gain,
+                "is_flash": scan_state.is_flash[row_index], "is_advantage": scan_state.is_advantage[row_index],
+                "sources": {"icons": icon_source, "fail_rate": fail_source, "gain": gain_source},
+                "stamina_fallback_input": stamina_pct, "fail_reads": fail_reads, "gain_text": gain_text,
+                "gain_region": [0.164, 0.365 + row_index * 0.0694, 0.05, 0.043],
+                "fail_region": [rrx, rry, rrw, rrh] if self.engine.use_per_row_fail_rate else None,
+            })
         gain_str = f" +{gain}" if gain > 0 else ""
         print(f"  [{row_index + 1}] {name}: {icon_count}图标 {fail_rate}%失败{gain_str}")
 
@@ -1420,22 +1475,12 @@ class Trainer(RuntimeSession):
 
     def _read_training_options_legacy(self, screenshot, failure_rate) -> list:
         options = []
-        h, w = screenshot.shape[:2]
+        scan_state = TrainingMetricScanState()
+        self._try_read_stats(scan_state)
         for i, (name, _, _) in enumerate(_TRAINING_ROWS):
-            rx, ry, rw, rh = 0.50, 0.26 + i * 0.10, 0.45, 0.08
-            px = max(0, int(w * rx))
-            py = max(0, int(h * ry))
-            pw = min(int(w * rw), w - px)
-            ph = min(int(h * rh), h - py)
-            roi = screenshot[py:py + ph, px:px + pw]
-            texts = self.ui.ocr.recognize(roi)
-            all_text = " ".join([t[0] for t in texts])
-            gain = 3
-            nums = re.findall(r'\+?(\d+)', all_text)
-            if nums:
-                gain = max(int(n) for n in nums if 0 < int(n) <= 20)
-            attr_name = self._match_attribute(all_text) or name
-            options.append(TrainingOption(i + 1, attr_name, gain, failure_rate))
+            self._read_row_metrics(scan_state, i)
+            options.append(TrainingOption(i + 1, name, scan_state.gain_values[i],
+                                          scan_state.fail_rates[i]))
         return options
 
     def _match_attribute(self, text: str) -> str | None:
