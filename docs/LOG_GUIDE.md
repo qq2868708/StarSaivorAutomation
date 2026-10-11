@@ -196,6 +196,16 @@ collected_logs/
 | `card_select` | 奖励卡片选择 | `card_index`, `reason`, `card_texts[3]` |
 | `handler` | 画面处理器调度 | `name` 处理器名, `elapsed_ms` 耗时 |
 | `fallback` | 偏离规则的保底决策或有限自动恢复 | `scope`, `reason`, `rule`, `chosen`, `candidates`, `evidence`, `screenshot` |
+| `turn_policy` | 用户回合/阶段参考行为及实际决策 | `instruction.action/source/turn`, `base_action`, `final_action`, `progress`, `evidence` |
+
+训练决策的 `overrides.turn_instruction` 保存最终采用的用户指令；`turn_policy`
+同时保存覆盖前后行为和回合来源。`progress.after_void` 表示已观察到虚空战结果，
+`last_evidence` 关联用于确认进展的观测。商店 `scanned` 条目中的
+`purchase_policy.mode/source` 区分具体商品、类别、默认和原规则过滤。
+按目标安排时 `instruction.goal_id/goal_turn` 标识目标及局部回合，
+`subjugation_policy/commission_policy` 保存对应的允许、优先或禁止配置。
+主菜单的 `journey_activity` 图像证据与 `turn_policy.final_action` 记录实际进入的行动，
+不把选择委托的意图冒充已经完成委托。
 
 保底决策同时汇总到运行日志的 `fallbacks`、`summary.fallback_count` 和同一旅途
 结果的 `fallbacks`、`outcome.fallback_count`。反复保存同一片段不会重复累计，

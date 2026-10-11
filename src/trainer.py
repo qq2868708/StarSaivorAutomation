@@ -32,6 +32,7 @@ import numpy as np
 
 from .capture import ScreenCapture
 from .controller import Controller, InputTargetError, SceneTransitionError
+from .automation_preferences import turn_instruction
 from .journey_target import JourneyTargetPending
 from .recognition import GameUI, OCREngine, GameStateReader, ScreenDetector
 from .decision import DecisionEngine, TrainingOption, GameState
@@ -75,6 +76,7 @@ from .handlers import (
     JourneyEndException,
     JourneyTransitionHandler,
     MainMenuHandler,
+    GoalMenuHandler,
     AppraisalHandler,
     CombatHandler,
     UnknownHandler,
@@ -289,6 +291,7 @@ class Trainer(RuntimeSession):
             JourneyTransitionHandler(),
             JourneyEndHandler(config),
             MainMenuHandler(),
+            GoalMenuHandler(),
             UnknownHandler(),
         ])
 
@@ -440,6 +443,7 @@ class Trainer(RuntimeSession):
                 self._runtime_status(final, self._exit_reason)
             finally:
                 self.runtime.release()
+                self._notifier.close()
             print(f"[完成] 本次执行 {self.round_count} 轮；原因={self._exit_reason}")
 
     def _on_runtime_frame(self, screenshot):
@@ -479,7 +483,12 @@ class Trainer(RuntimeSession):
                 record_error = None
             except Exception as error:
                 record_items, record_error = [], str(error)
-            self.logger.observe_frame(record_items, handler.name, self.round_count, error=record_error)
+            observation = self.logger.observe_frame(record_items, handler.name, self.round_count, error=record_error)
+            progress = self._journey_progress.observe(
+                record_items, handler.name, observation.get("id") if isinstance(observation, dict) else None,
+                size=(screenshot.shape[1], screenshot.shape[0]),
+                goals=self.config.get("turn_plan", {}).get("goals"))
+            self._handler_ctx.detected_turn = progress["turn"]
             self._event("handler_matched", handler=handler.name)
             self._handlers._consecutive_misses = 0
             if isinstance(handler, UnknownHandler):
@@ -524,19 +533,21 @@ class Trainer(RuntimeSession):
         if img is None:
             return None
         items = self.ui.ocr.recognize(img)
-        all_text = " ".join([t[0] for t in items])
-        match = re.search(r'(?<!\d)(\d{1,2})\s*/\s*45(?!\d)', all_text)
-        if match and 1 <= int(match.group(1)) <= 45:
-            turn = int(match.group(1))
+        turns = {int(match[1]) for text, confidence, *_ in items if confidence >= .85
+                 for match in re.finditer(r'(?<!\d)(\d{1,2})\s*/\s*45(?!\d)', text)
+                 if 1 <= int(match[1]) <= 45}
+        if len(turns) == 1:
+            turn = next(iter(turns))
+            progress = getattr(self, "_journey_progress", None)
+            if progress and (progress.data["turn"] is None or turn >= progress.data["turn"]):
+                progress.data.update(turn=turn, source="ocr")
             print(f"[回合] {turn}/45")
             return turn
+        progress = getattr(self, "_journey_progress", None)
+        if progress and progress.data["turn"] is not None:
+            return progress.data["turn"]
         print("[回合] 当前画面未显示 X/45，使用普通训练规则")
         return None
-
-    def _increment_turn(self):
-        """训练或休息完成后递增回合计数"""
-        if self._handler_ctx.detected_turn is not None:
-            self._handler_ctx.detected_turn += 1
 
     def _handle_training_screen(self, screenshot) -> bool:
         """训练决策 + 执行 (移植自 SleepRunner TrainingSelectHandler)"""
@@ -548,6 +559,17 @@ class Trainer(RuntimeSession):
         # 当前客户端没有底部横排支援卡。旧颜色检测会把立绘误判为卡片，
         # 因而不能在训练决策前执行该点击分支。
         self._handler_ctx.try_detect_turn()
+        if callable(getattr(self._handler_ctx, "activity_instruction", None)):
+            instruction = self._handler_ctx.activity_instruction()
+            progress = self._journey_progress.data
+            attempt = (instruction.get("goal_id"), instruction.get("goal_turn"),
+                       progress.get("date"), instruction["action"])
+            if instruction["action"] in {"commission", "subjugation"} and getattr(
+                    self._handler_ctx, "activity_plan_attempt", None) != attempt:
+                self._handler_ctx.activity_plan_attempt = attempt
+                self.controller.send_escape()
+                self._handler_ctx.pending_screenshot = None
+                return True
 
         # 读取游戏状态
         state_cache = {key: getattr(self, key, None)
@@ -580,8 +602,24 @@ class Trainer(RuntimeSession):
                 self.logger.end_turn()
                 return False
             action, target = self.engine.make_decision(options, state, debug=True)
+            progress = getattr(self, "_journey_progress", None)
+            instruction = turn_instruction(
+                self.config.get("turn_plan", {}), self._handler_ctx.detected_turn,
+                bool(progress and progress.data["after_void"]), progress.data if progress else None)
+            base_action = action
+            requested = instruction["action"]
+            if requested == "rest":
+                action, target = "rest", None
+            elif requested not in {"inherit", "rules", "commission", "subjugation"}:
+                row_actions = ["train_strength", "train_stamina", "train_agility", "train_focus", "train_guard"]
+                row = row_actions.index(requested) if requested in row_actions else None
+                target = (next((item for item in options if item.attr_id == row + 1), None)
+                          if row is not None else max(options, key=lambda item: item.gain))
+                if target is not None:
+                    action = "train"
             self.logger.log_decision_traditional(
                 options, state, target if action == "train" else None, action=action)
+            self.logger.log_turn_policy(instruction, base_action, action, progress.data if progress else {})
 
         if action == "train":
             result = self._execute_train(target)
@@ -711,19 +749,34 @@ class Trainer(RuntimeSession):
     def _finish_training_decision(self, decision, scan_state, turn, state):
         base_result = replace(decision[1])
         final = self._apply_camp_strategy(decision, scan_state, turn, state)
+        progress = getattr(self, "_journey_progress", None)
+        instruction = turn_instruction(self.config.get("turn_plan", {}), turn,
+                                       bool(progress and progress.data["after_void"]), progress.data if progress else None)
         context = scan_state.to_decision_context(
             self.engine.rule_profile, self.engine.rule_profile_name,
             self.engine.adventure_gain_threshold,
             target_stats=getattr(self, "_target_stats", {}),
             current_stats={"力量": scan_state.strength_stat, "体力": scan_state.stamina_stat,
                            "韧性": None, "专注": None, "保护": None})
+        action = instruction["action"]
+        if action not in {"rules", "inherit", "commission", "subjugation"}:
+            row_actions = ["train_strength", "train_stamina", "train_agility", "train_focus", "train_guard"]
+            row = row_actions.index(action) if action in row_actions else None
+            final = ("rest" if action == "rest" else "train", TrainingDecisionResult(
+                action=TrainingDecisionAction.REST if action == "rest" else (
+                    TrainingDecisionAction(action) if row is not None else TrainingDecisionAction.TRAIN_BEST_GAIN),
+                target_row_index=row, matched_rule_id=f"user_{instruction['source']}",
+                summary=f"用户回合计划: {action}"))
         if final[0] == "train" and final[1].target_row_index is None:
             final[1].target_row_index = TrainingRuleEngine._score_training_rows(context)
         self.logger.log_decision_rule_engine(
             final[1], context, scan_state, base_result=base_result,
             overrides={"game_turn": turn, "mood": state.mood,
                        "final_action": final[0], "base_action": decision[0],
+                       "turn_instruction": instruction,
                        "camp_configuration": self.config.get("camp", {})})
+        self.logger.log_turn_policy(instruction, decision[0], final[0],
+                                    progress.data if progress else {})
         return final
 
     def _apply_camp_strategy(self, decision, scan_state, turn, state):
@@ -1269,6 +1322,7 @@ class Trainer(RuntimeSession):
         self.controller.click_at_percent(rx, ry)
         self.controller.wait(_CLICK_ROW_WAIT)
 
+        self._prepare_turn_action("train")
         self.controller.click_at_percent(_TRAIN_BTN_X, _TRAIN_BTN_Y)
         self.controller.wait(_CLICK_TRAIN_WAIT)
 
@@ -1300,7 +1354,6 @@ class Trainer(RuntimeSession):
         if ss is not None:
             self._handler_ctx.pending_screenshot = ss
 
-        self._increment_turn()
         return True
 
     # ===================== 休息流程 =====================
@@ -1333,7 +1386,6 @@ class Trainer(RuntimeSession):
                     option_id=0, option_name="休息流程",
                     cost=0, stamina_before=self._last_stamina or 0,
                     reason="规则引擎判定休息")
-                self._increment_turn()
                 return True
         else:
             # 超时: 可能被事件/弹窗挡住, ESC 回退让 dispatch 重新检测
@@ -1381,6 +1433,7 @@ class Trainer(RuntimeSession):
             self.controller.click_at_percent(rx, ry)
             time.sleep(0.15)
         # 点击确认
+        self._prepare_turn_action("rest")
         self.controller.click_at_percent(0.89, 0.925)
         time.sleep(0.3)
 
@@ -1399,7 +1452,6 @@ class Trainer(RuntimeSession):
             option_id=option_idx + 1, option_name=names[option_idx],
             cost=[0, 30, 60][option_idx], stamina_before=stamina,
             reason=reason)
-        self._increment_turn()
 
     # ===================== 阿尔克那支援卡 (第一年) =====================
 

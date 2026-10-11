@@ -509,8 +509,102 @@ function renderConfig(specs) {
   $("configGrid").dataset.loaded = "1";
 }
 
+const purchaseOptions = { inherit: "继承", auto: "按规则", buy: "买", skip: "不买" };
+function selectOptions(options, value, excludeInherit = false) {
+  return Object.entries(options).filter(([key]) => !excludeInherit || key !== "inherit")
+    .map(([key, label]) => `<option value="${esc(key)}"${key === value ? " selected" : ""}>${esc(label)}</option>`).join("");
+}
+
+function renderPreferences(data) {
+  state.preferences = structuredClone(data.preferences);
+  state.shopCatalog = data.shop_catalog || [];
+  state.shopTypes = data.shop_types;
+  state.turnActions = data.turn_actions;
+  state.goalDefinitions = data.journey_goals || [];
+  state.actionPolicies = data.action_policies || {};
+  const { notifications: sound, purchase_rules: shop, turn_plan: plan } = state.preferences;
+  $("soundEnabled").checked = sound.enabled;
+  $("soundVolume").value = sound.volume;
+  $("soundVolumeValue").textContent = `${sound.volume}%`;
+  $("soundJourneyEnd").checked = sound.events.journey_end;
+  $("soundPaused").checked = sound.events.paused_safe;
+  $("soundRecovered").checked = sound.events.recovered;
+  $("shopDefault").value = shop.default;
+  $("shopCategoryRules").innerHTML = Object.entries(state.shopTypes).map(([key, label]) =>
+    `<tr><td>${esc(label)}</td><td><select aria-label="${esc(label)}购买策略" data-category="${esc(key)}">${selectOptions(purchaseOptions, shop.categories[key] || "inherit")}</select></td></tr>`).join("");
+  $("turnPlanEnabled").checked = plan.enabled;
+  $("turnDefault").innerHTML = selectOptions(state.turnActions, plan.default_action, true);
+  $("subjugationPolicy").innerHTML = selectOptions(state.actionPolicies, plan.subjugation_policy);
+  $("commissionPolicy").innerHTML = selectOptions(state.actionPolicies, plan.commission_policy);
+  $("turnRangeAction").innerHTML = selectOptions(state.turnActions, "inherit");
+  $("turnRangeGoal").innerHTML = state.goalDefinitions.map(goal =>
+    `<option value="${esc(goal.id)}">${esc(goal.name)}</option>`).join("");
+  $("goalPlanSections").innerHTML = state.goalDefinitions.map(goal => {
+    const setting = plan.goals[goal.id], count = setting.turn_count;
+    return `<section class="goal-plan" data-goal-section="${esc(goal.id)}">
+      <div class="goal-plan-heading"><h4>${esc(goal.name)}</h4><span>${count} 个行动回合 · ${count === goal.turns ? "实机核验" : "自定义"} · ${goal.months.join("、")}月</span></div>
+      <div class="preference-controls">
+        <label>目标默认行为<select data-goal-default="${esc(goal.id)}">${selectOptions(state.turnActions, setting.default_action)}</select></label>
+        <label>讨伐<select data-goal-subjugation="${esc(goal.id)}">${selectOptions({inherit:"继承全局", ...state.actionPolicies}, setting.subjugation_policy)}</select></label>
+        <label>普通委托<select data-goal-commission="${esc(goal.id)}">${selectOptions({inherit:"继承全局", ...state.actionPolicies}, setting.commission_policy)}</select></label>
+      </div>
+      <div class="turn-plan-grid">${Array.from({length:count}, (_, i) =>
+        `<label class="turn-plan-cell"><span>第 ${i + 1} 回合 · 距目标 ${count - i}</span>
+          <select data-goal="${esc(goal.id)}" data-goal-turn="${i + 1}" aria-label="${esc(goal.name)}第${i + 1}回合">${selectOptions(state.turnActions, setting.turns[i + 1] || "inherit")}</select>
+        </label>`).join("")}</div>
+    </section>`;
+  }).join("");
+  $("saveConfigBtn").disabled = !state.goalDefinitions.length;
+  if (!state.goalDefinitions.length) showToast("配置接口版本不匹配，请打开新版预览服务", true);
+  updateGoalRange();
+  refreshActivityOptions();
+  renderShopPolicies();
+}
+
+function renderShopPolicies() {
+  if (!state.preferences) return;
+  const names = new Set([...state.shopCatalog.map(item => item.name.replace(/\s+/g, "")),
+    ...Object.keys(state.preferences.purchase_rules.items)]);
+  const query = $("shopPolicySearch").value.trim().toLowerCase();
+  $("shopItemRules").innerHTML = [...names].filter(name => name.toLowerCase().includes(query))
+    .sort((a, b) => a.localeCompare(b, "zh")).map(name =>
+      `<tr><td>${esc(name)}</td><td><select data-item="${esc(name)}" aria-label="${esc(name)}购买策略">${selectOptions(purchaseOptions, state.preferences.purchase_rules.items[name] || "inherit")}</select></td></tr>`
+    ).join("") || '<tr><td colspan="2" class="empty-cell">暂无匹配商品</td></tr>';
+}
+
+function collectPreferences() {
+  const result = structuredClone(state.preferences);
+  result.notifications = {
+    enabled: $("soundEnabled").checked, volume: Number($("soundVolume").value),
+    events: { journey_end: $("soundJourneyEnd").checked, paused_safe: $("soundPaused").checked,
+      recovered: $("soundRecovered").checked },
+  };
+  result.purchase_rules.default = $("shopDefault").value;
+  result.purchase_rules.categories = {};
+  document.querySelectorAll("[data-category]").forEach(select => {
+    if (select.value !== "inherit") result.purchase_rules.categories[select.dataset.category] = select.value;
+  });
+  Object.assign(result.turn_plan, {enabled: $("turnPlanEnabled").checked, default_action: $("turnDefault").value,
+    subjugation_policy: $("subjugationPolicy").value, commission_policy: $("commissionPolicy").value});
+  for (const goal of state.goalDefinitions) {
+    const settings = result.turn_plan.goals[goal.id];
+    settings.default_action = document.querySelector(`[data-goal-default="${goal.id}"]`).value;
+    settings.subjugation_policy = document.querySelector(`[data-goal-subjugation="${goal.id}"]`).value;
+    settings.commission_policy = document.querySelector(`[data-goal-commission="${goal.id}"]`).value;
+    settings.turns = {};
+    document.querySelectorAll(`[data-goal="${goal.id}"]`).forEach(select => {
+      if (select.value !== "inherit") settings.turns[select.dataset.goalTurn] = select.value;
+    });
+  }
+  return result;
+}
+
 async function loadConfig() {
-  try { renderConfig((await api("/api/config")).specs || []); }
+  try {
+    const data = await api("/api/config");
+    renderConfig(data.specs || []);
+    renderPreferences(data);
+  }
   catch (error) { showToast(`读取配置失败：${error.message}`, true); }
 }
 
@@ -519,9 +613,11 @@ async function saveConfig() {
   document.querySelectorAll(".config-input").forEach((input) => { updates[input.dataset.path] = input.value.trim(); });
   try {
     const data = await api("/api/config", {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ updates }),
+      method: "PUT", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ updates, preferences: collectPreferences() }),
     });
     renderConfig(data.specs || []);
+    renderPreferences(data);
     showToast("配置已保存到 config.yaml");
   } catch (error) { showToast(`保存配置失败：${error.message}`, true); }
 }
@@ -892,6 +988,111 @@ function renderQuickLookupFamily(family, value, task, logs = []) {
     const state = item.verified === false ? "未确认" : "已确认";
     return `<div class="quick-lookup-card ${item.verified === false ? "failed" : ""}">${source ? `<img src="${source}" alt="${esc(item.name)}" loading="lazy">` : "<div class=\"screenshot-placeholder\">无图</div>"}<strong>${esc(item.name)}</strong><small>${state}</small></div>`;
   }).join("");
+}
+
+async function previewSound() {
+  const button = $("previewSoundBtn");
+  button.disabled = true;
+  const volume = Number($("soundVolume").value);
+  // Unlock browser audio within the click gesture, before any network wait.
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  let context;
+  let unlocked;
+  try {
+    if (AudioContextClass) {
+      context = new AudioContextClass();
+      unlocked = context.resume().catch(() => false);
+    }
+  } catch (_) { /* Native playback remains available in restricted webviews. */ }
+  try {
+    if (!volume) { showToast("当前音量为 0，已静音"); return; }
+    let nativePlayed = false;
+    try {
+      const result = await api("/api/notification-preview", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ event: "journey_end", volume }),
+      });
+      nativePlayed = result.played === true;
+    } catch (_) { /* Old local servers may not provide this endpoint yet. */ }
+    if (nativePlayed) { showToast("已播放旅程结束提示音（本机）"); return; }
+    await unlocked;
+    if (!context || context.state !== "running") throw new Error("本机播放不可用，浏览器也未允许音频播放");
+    const start = context.currentTime;
+    [660, 880, 1100].forEach((frequency, index) => {
+      const oscillator = context.createOscillator();
+      const gain = context.createGain();
+      const at = start + index * .16;
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(volume / 100 * .305, at + .008);
+      gain.gain.setValueAtTime(volume / 100 * .305, at + .108);
+      gain.gain.linearRampToValueAtTime(0, at + .12);
+      oscillator.connect(gain);
+      gain.connect(context.destination);
+      oscillator.start(at);
+      oscillator.stop(at + .12);
+    });
+    await new Promise(resolve => setTimeout(resolve, 500));
+    showToast("已播放旅程结束提示音（浏览器）");
+  } catch (error) { showToast(`试听失败：${error.message}`, true); }
+  finally {
+    if (context) context.close().catch(() => {});
+    button.disabled = false;
+  }
+}
+
+$("soundVolume").addEventListener("input", () => { $("soundVolumeValue").textContent = `${$("soundVolume").value}%`; });
+$("previewSoundBtn").addEventListener("click", previewSound);
+$("shopPolicySearch").addEventListener("input", renderShopPolicies);
+$("shopItemRules").addEventListener("change", event => {
+  const select = event.target.closest("[data-item]");
+  if (!select) return;
+  if (select.value === "inherit") delete state.preferences.purchase_rules.items[select.dataset.item];
+  else state.preferences.purchase_rules.items[select.dataset.item] = select.value;
+});
+$("addShopItemBtn").addEventListener("click", () => {
+  const name = $("customShopItem").value.replace(/\s+/g, "");
+  if (!name) { $("customShopItem").focus(); return; }
+  if (!state.preferences) return;
+  state.preferences.purchase_rules.items[name] = "auto";
+  $("shopPolicySearch").value = name;
+  $("customShopItem").value = "";
+  renderShopPolicies();
+});
+$("applyTurnRangeBtn").addEventListener("click", () => {
+  const goalId = $("turnRangeGoal").value;
+  const count = state.preferences.turn_plan.goals[goalId]?.turn_count || 0;
+  const from = Number($("turnRangeFrom").value), to = Number($("turnRangeTo").value);
+  if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to > count || from > to) {
+    showToast(`该目标的回合范围为 1 至 ${count}`, true); return;
+  }
+  for (let turn = from; turn <= to; turn++) {
+    document.querySelector(`[data-goal="${goalId}"][data-goal-turn="${turn}"]`).value = $("turnRangeAction").value;
+  }
+});
+$("turnRangeGoal").addEventListener("change", updateGoalRange);
+function updateGoalRange() {
+  const count = state.preferences?.turn_plan.goals?.[$("turnRangeGoal").value]?.turn_count || 1;
+  $("turnRangeFrom").value = 1;
+  $("turnRangeTo").value = count;
+  $("turnRangeFrom").max = count;
+  $("turnRangeTo").max = count;
+}
+
+function refreshActivityOptions() {
+  const ids = {subjugation: "subjugationPolicy", commission: "commissionPolicy"};
+  for (const select of document.querySelectorAll("[data-goal-turn], [data-goal-default], #turnDefault")) {
+    const goal = select.dataset.goal || select.dataset.goalDefault;
+    for (const [kind, id] of Object.entries(ids)) {
+      const local = goal ? document.querySelector(`[data-goal-${kind}="${goal}"]`)?.value : "inherit";
+      const policy = local && local !== "inherit" ? local : $(id).value;
+      const option = select.querySelector(`option[value="${kind}"]`);
+      if (option) option.disabled = policy === "skip";
+    }
+  }
+}
+for (const id of ["subjugationPolicy", "commissionPolicy", "goalPlanSections"]) {
+  $(id).addEventListener("change", refreshActivityOptions);
 }
 
 function selectEvidenceFrame(index) {

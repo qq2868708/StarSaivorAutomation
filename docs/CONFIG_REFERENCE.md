@@ -442,6 +442,67 @@ survival_priority:
 保底不会增加游戏重试次数或自动购买额外资源，目标装备未确认获得时仍保持未达成。
 人工暂停与输入目标保护不因开启保底而失效。
 
+### 提示音、购买清单与回合计划
+
+配置页可直接编辑下列配置，保存后在下一次脚本启动时生效。
+
+- `notifications.enabled`：总开关。默认启用，默认只播放旅程结束提示。
+- `notifications.volume`：0 至 100；0 为静音。`events.journey_end`、
+  `events.paused_safe`、`events.recovered` 分别控制结束、暂停、恢复提示。
+  暂停和恢复默认关闭。音效在脚本进程播放，无需保持浏览器打开；
+  同一状态重复刷新不重播，设备播放失败不影响脚本收尾。页面试听优先使用同一
+  本机播放通道；旧服务缺少接口或本机播放失败时可使用点击手势内解锁的 Web Audio。
+- `shop.purchase_rules.default`、`categories`、`items`：购买策略值为 `auto`、
+  `buy`、`skip`。具体商品名优先于类别，类别优先于默认；具体商品的
+  观测名称或标准名称任一个命中 `skip` 就不购买。名字只归一化空白，
+  不用模糊包含匹配扩大允许购买范围。`buy` 覆盖属性、心情、耐力偏好，
+  但不跳过售罄和购买失败检查，不购买额外货币。`auto` 保留原评分策略。
+- `turn_plan.enabled`：启用用户回合计划。默认关闭。
+- 当前配置页以 `turn_plan.goals` 按旅程目标分组，各目标有 `turn_count`、
+  `default_action`、`turns`、`subjugation_policy` 和 `commission_policy`。
+  虚空评鉴战与最终评鉴战前各 3 个行动回合的实机依据见
+  `docs/journey-goal-validation.md`。这些回合可安排训练、休息、讨伐或普通委托，
+  不等于固定次数的训练。旧全局编号配置保留兼容，不作为新的阶段划分依据。
+- `subjugation_policy` / `commission_policy` 支持 `prefer`、`allow`、`skip`。
+  默认分别为优先讨伐和不做普通委托。目标可继承或覆盖全局设置；
+  先排除禁止行动，再处理优先行动，最后执行该目标的回合安排。
+- `turn_plan.default_action`：默认 `rules`。`after_void_action` 和全局 `turns`
+  保留旧配置兼容；新版配置页编辑 `goals.<目标>.turns`，只允许该目标的局部回合，
+  批量设置也限定在一个目标内。单回合的显式行为（包括 `rules`）优先于目标默认；
+  `inherit` 继承目标/全局默认。禁止行动的过滤和优先行动规则先于参考行为执行。
+- 行为支持 `rules`、`train`（强制训练但自动评分选属性）、`rest`、
+  `train_strength`、`train_stamina`、`train_agility`、`train_focus`、`train_guard`、
+  `subjugation`（讨伐）、`commission`（普通委托）。
+  训练/休息行为在普通规则及合宿覆盖之后应用；委托、讨伐由主菜单入口分派，
+  不是在训练页假装执行。入口缺失或被禁止时会记录原因并选可用的允许行动。
+- `turn_plan.start_turn`：无法读到 X/45 时的人工校准起点，默认 `null`。
+  它不是调度次数；已有可靠 checkpoint 的回合不会被此设置倒退覆盖。
+  中途接管且既无可靠回合又未填起点时，不套用未知编号的单回合规则，
+  仍执行默认/已确认阶段规则。虚空阶段由准备页和实际战斗结果识别，不硬编码回合号。
+
+示例：虚空战后进入最终评鉴战准备阶段，三个行动回合默认训练，
+但第 2 回合允许玩家安排普通委托：
+
+```yaml
+turn_plan:
+  enabled: true
+  default_action: rules
+  subjugation_policy: prefer
+  commission_policy: skip
+  goals:
+    final:
+      turn_count: 3
+      default_action: train
+      subjugation_policy: allow
+      commission_policy: allow
+      turns:
+        "2": commission
+```
+
+只有从第一回合开始运行时才将起点设为 1。训练/休息结果或已提交行动后的
+日期变化确认一次决策推进，普通委托仅在日历实际变化时计入；进入休息菜单、
+重复截图、失败点击、重试战斗和调度循环都不直接递增回合。
+
 ## 三、事件决策 Profile（`profiles/events/<name>.json`）
 
 事件 Profile 与训练 Profile 同名，通过 `config.yaml` 中的 `training.rule_profile` 自动关联。

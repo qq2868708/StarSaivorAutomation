@@ -10,6 +10,8 @@ rescuer or Arcana details before returning to their lists.
 from __future__ import annotations
 
 import json
+import copy
+import math
 import os
 import subprocess
 import sys
@@ -25,7 +27,7 @@ from urllib.parse import quote
 import uvicorn
 import yaml
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from src.event_effects import quantify_effect_text
@@ -36,6 +38,9 @@ from src.journey_target import JourneyTargetStore, JourneyTargetPending, load_ca
 from src.journey_record import JourneyRecordStore
 from src.journey_info_scan import JourneyInfoScanner, JourneyInfoScanError
 from src.quick_lookup import QuickLookupInterrupted, QuickLookupScanner, QuickLookupStore, build_match
+from src.automation_preferences import preferences, validate_preferences, SHOP_TYPES, TURN_ACTIONS
+from src.notifications import tone_wav, SoundNotifier
+from src.journey_plan import GOALS, GOAL_MAP, ACTION_POLICIES
 
 
 ROOT = Path(__file__).resolve().parent
@@ -52,9 +57,10 @@ TRAINING_TARGETS = {
     "保护训练": (0.86, 0.68),
 }
 ACTION_TYPES = {"decision", "train", "rest", "event", "arcanum", "card_select", "shop",
-                "commission", "battle_choice"}
+                "commission", "battle_choice", "turn_policy"}
 
 _automation_lock = threading.RLock()
+_config_lock = threading.RLock()
 _automation_process: subprocess.Popen[str] | None = None
 _automation_log_handle = None
 _runtime_control = RuntimeControl(ROOT)
@@ -93,6 +99,11 @@ def _option_summary(option: dict[str, Any]) -> str:
 
 
 def _target_text(action: dict[str, Any]) -> str:
+    if action.get("type") == "turn_policy":
+        instruction = action.get("instruction", {})
+        if instruction.get("goal_id") in GOAL_MAP:
+            return f"{GOAL_MAP[instruction['goal_id']]['name']} · 第{instruction.get('goal_turn') or '?'}回合"
+        return f"Turn {instruction.get('turn') or '?'} · {instruction.get('source', '')}"
     if "target_x" in action and "target_y" in action:
         return f"客户区 ({float(action['target_x']):.3f}, {float(action['target_y']):.3f})"
     row = action.get("row_index", action.get("target_row"))
@@ -145,8 +156,9 @@ class DataStore:
                                encoding="utf-8")
 
     def save_config(self) -> None:
-        CONFIG_PATH.write_text(yaml.safe_dump(self.config, allow_unicode=True, sort_keys=False),
-                               encoding="utf-8")
+        temporary = CONFIG_PATH.with_suffix(".yaml.tmp")
+        temporary.write_text(yaml.safe_dump(self.config, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        os.replace(temporary, CONFIG_PATH)
 
     def logs(self) -> list[tuple[Path, dict[str, Any]]]:
         result: list[tuple[Path, dict[str, Any]]] = []
@@ -204,7 +216,8 @@ class DataStore:
                     "type": action.get("type", "action"),
                     "time": str(action.get("ts") or action.get("timestamp") or "").split("T")[-1][:8],
                     "decision": action.get("attribute") or action.get("action") or
-                                action.get("event_name") or action.get("name") or action.get("tier") or "—",
+                                action.get("event_name") or action.get("name") or action.get("tier") or
+                                action.get("instruction", {}).get("action") or "—",
                     "target": _target_text(action),
                     "screenshot": action.get("screenshot"),
                     "screenshot_url": f"/api/screenshot?path={quote(str(action.get('screenshot')), safe='')}"
@@ -985,23 +998,87 @@ def update_event(index: int, body: dict[str, Any]) -> dict[str, Any]:
 @app.get("/api/config")
 def config_values() -> dict[str, Any]:
     store.reload()
-    return {"specs": store.weight_specs()}
+    return _config_payload()
+
+
+def _config_payload():
+    profile = str(store.config.get("training", {}).get("rule_profile", "default"))
+    catalog = []
+    if profile and all(c.isalnum() or c in "-_" for c in profile):
+        path = ROOT / "profiles" / "shop" / f"{profile}.json"
+        if path.is_file():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            seen = set()
+            for item in data.get("items", []):
+                name = str(item.get("name") or "").strip()
+                if name and name not in seen and item.get("type") in SHOP_TYPES:
+                    catalog.append({"name": name, "type": item["type"]})
+                    seen.add(name)
+    return {"specs": store.weight_specs(), "preferences": preferences(store.config),
+            "shop_types": SHOP_TYPES, "turn_actions": TURN_ACTIONS, "shop_catalog": catalog,
+            "journey_goals": GOALS, "action_policies": ACTION_POLICIES, "preferences_version": 2}
 
 
 @app.put("/api/config")
 def update_config(body: dict[str, Any]) -> dict[str, Any]:
-    store.reload()
-    updates = body.get("updates")
-    if not isinstance(updates, dict):
-        raise HTTPException(400, "updates 必须是对象")
-    for path, raw in updates.items():
+    with _config_lock:
+        store.reload()
+        updates = body.get("updates", {})
+        if not isinstance(updates, dict):
+            raise HTTPException(400, "updates 必须是对象")
+        next_config = copy.deepcopy(store.config)
+        allowed = {item["path"] for item in store.weight_specs()}
+        for path, raw in updates.items():
+            try:
+                if path not in allowed or type(raw) is bool:
+                    raise ValueError()
+                value = float(raw)
+                if not math.isfinite(value):
+                    raise ValueError()
+                value = int(value) if value.is_integer() else value
+            except (TypeError, ValueError, OverflowError):
+                raise HTTPException(400, f"参数无效：{path}")
+            store.set_path(next_config, path, value)
+        if "preferences" in body:
+            try:
+                settings = validate_preferences(body["preferences"])
+            except (ValueError, TypeError) as error:
+                raise HTTPException(400, str(error))
+            next_config["notifications"] = settings["notifications"]
+            next_config["turn_plan"] = settings["turn_plan"]
+            next_config.setdefault("shop", {})["purchase_rules"] = settings["purchase_rules"]
+        previous = store.config
+        store.config = next_config
         try:
-            value = float(raw) if isinstance(raw, str) and "." in raw else int(raw)
-        except (TypeError, ValueError):
-            raise HTTPException(400, f"参数无效：{path}")
-        store.set_path(store.config, str(path), value)
-    store.save_config()
-    return {"ok": True, "specs": store.weight_specs()}
+            store.save_config()
+        except Exception:
+            store.config = previous
+            raise
+        return {"ok": True, **_config_payload()}
+
+
+@app.get("/api/notification-preview")
+def notification_preview(event: str = "journey_end", volume: int = 50):
+    try:
+        data = tone_wav(event, volume)
+    except ValueError as error:
+        raise HTTPException(400, str(error))
+    return Response(data, media_type="audio/wav", headers={"Cache-Control": "no-store"})
+
+@app.post("/api/notification-preview")
+def play_notification_preview(body: dict[str, Any]):
+    event, volume = body.get("event", "journey_end"), body.get("volume", 50)
+    try:
+        data = tone_wav(event, volume)
+    except (ValueError, TypeError) as error:
+        raise HTTPException(400, str(error))
+    if volume == 0:
+        return {"played": False, "muted": True}
+    try:
+        SoundNotifier._play(data)
+    except Exception as error:
+        raise HTTPException(503, f"本机音频播放失败：{type(error).__name__}")
+    return {"played": True, "muted": False}
 
 
 @app.get("/api/screenshot")

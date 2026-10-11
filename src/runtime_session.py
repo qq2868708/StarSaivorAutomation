@@ -16,6 +16,9 @@ from .runtime_control import RuntimeControl, RuntimeInterrupt
 from .journey_target import JourneyTargetStore, JourneyTargetPending, precheck_target
 from .event_exploration import EventExplorationStore, aggregate_effects, new_attempt
 from .journey_record import now_iso
+from .automation_preferences import JourneyProgress, preferences
+from .journey_plan import goal_instruction
+from .notifications import SoundNotifier
 
 
 class SafePauseError(RuntimeError):
@@ -54,6 +57,12 @@ class RuntimeSession:
         self._paused_at = None
         self._diagnostics = {}
         self._auto_recovery_counts = {}
+        self._notifier = SoundNotifier(self.config.get("notifications", {}))
+        self._journey_progress = JourneyProgress(self.config.get("turn_plan", {}).get("start_turn"))
+        self._handler_ctx.prepare_turn_action = self._prepare_turn_action
+        self._handler_ctx.activity_instruction = lambda: goal_instruction(
+            preferences(self.config)["turn_plan"], self._journey_progress.data)
+        self._handler_ctx.journey_progress = lambda: self._journey_progress.data
         self._journey_target_store = JourneyTargetStore(self.runtime.root)
         self._journey_target = None
         self._journey_target_state = {}
@@ -141,14 +150,21 @@ class RuntimeSession:
         return float(np.abs(a - b).mean())
 
     def _runtime_status(self, state, reason="", **extra):
-        return self.runtime.write_status(
+        result = self.runtime.write_status(
             state, reason, run_id=self._run_id, round_count=self.round_count,
             pause_id=self._pause_id, frame_id=self._frame_id,
             last_handler=self._active_handler_name,
             auto_refocus=bool(getattr(self.controller, "auto_refocus", False)),
             journey_id=self._journey_id, journey_started_at=self._journey_started_at,
             screenshot=self._last_frame_screenshot, diagnostics=self._diagnostics,
-            journey_target=self._journey_target, journey_target_state=self._journey_target_state, **extra)
+            journey_target=self._journey_target, journey_target_state=self._journey_target_state,
+            decision_progress=self._journey_progress.data, **extra)
+        self._notifier.state_changed(state)
+        return result
+
+    def _prepare_turn_action(self, kind):
+        self._journey_progress.prepare(kind)
+        self._write_checkpoint("decision_prepared")
 
     def _event(self, event, **data):
         self.runtime.emit(self._run_id, event, round_count=self.round_count, journey_id=self._journey_id, **data)
@@ -172,6 +188,7 @@ class RuntimeSession:
             screenshot=self._last_frame_screenshot, last_handler=self._active_handler_name,
             last_action=self._last_logged_action, last_input=self._last_input,
             handler_state=handler_state, ai_action_ids=self._ai_action_ids,
+            decision_progress=self._journey_progress.data,
             journey_target=self._journey_target, journey_target_state=self._journey_target_state,
             safe_pause_reason=reason or self._safe_pause_reason, **extra)
 
@@ -237,6 +254,9 @@ class RuntimeSession:
         if not checkpoint or checkpoint.get("resumable") is False or checkpoint.get("phase") == "journey_end":
             return
         self._resume_checkpoint = checkpoint
+        self._journey_progress = JourneyProgress(
+            self.config.get("turn_plan", {}).get("start_turn"), checkpoint.get("decision_progress"))
+        self._handler_ctx.commission_origin = self._journey_progress.data.get("activity_origin", "subjugation")
         self._journey_id = checkpoint.get("journey_id") or self._journey_id
         self._journey_started_at = checkpoint.get("journey_started_at") or self._journey_started_at
         self._journey_entry_point = checkpoint.get("journey_entry_point") or "mid_journey"

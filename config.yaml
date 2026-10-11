@@ -15,6 +15,24 @@ events:
   # 本地静态快查索引；事件效果仍需 document_verified=true 才允许自动选择。
   quick_lookup: "profiles/events/document_verified.json"
 
+notifications:
+  enabled: true
+  volume: 50
+  events:
+    journey_end: true
+    paused_safe: false
+    recovered: false
+
+turn_plan:
+  enabled: false
+  start_turn: null
+  default_action: rules
+  after_void_action: rules
+  turns: {}
+  subjugation_policy: prefer
+  commission_policy: skip
+  goals: {}
+
 # ------------------------ 属性定义 ----------------------------
 # 枚举值 1-5 分别对应属性
 attributes:
@@ -263,6 +281,10 @@ commission:
 # ------------------------ 商店/交易 ----------------------------
 shop:
   enabled: true                      # 是否启用自动商店购买
+  purchase_rules:
+    default: auto
+    categories: {}
+    items: {}
 
   # 物品类型优先级 (越靠前越优先, 可自行调整顺序)
   item_priority:

@@ -310,6 +310,52 @@
           <div><h2>决策配置</h2><p>调整后保存，下一次脚本运行时生效</p></div>
           <button class="button primary" id="saveConfigBtn">保存配置</button>
         </div>
+        <div id="automationPreferences" class="automation-preferences">
+          <section class="preference-section">
+            <h3>旅程结束提示音</h3>
+            <div class="preference-controls">
+              <label class="check-field"><input type="checkbox" id="soundEnabled">启用提示音</label>
+              <label class="volume-field"><span>音量</span><input type="range" id="soundVolume" min="0" max="100" step="5"><output id="soundVolumeValue"></output></label>
+              <button type="button" class="button secondary" id="previewSoundBtn">试听结束提示</button>
+            </div>
+            <div class="preference-controls">
+              <label class="check-field"><input type="checkbox" id="soundJourneyEnd">旅程结束</label>
+              <label class="check-field"><input type="checkbox" id="soundPaused">安全暂停</label>
+              <label class="check-field"><input type="checkbox" id="soundRecovered">恢复运行</label>
+            </div>
+          </section>
+          <section class="preference-section">
+            <h3>商店购买</h3>
+            <div class="preference-controls">
+              <label>默认策略<select id="shopDefault"><option value="auto">按规则</option><option value="buy">买</option><option value="skip">不买</option></select></label>
+              <label>筛选商品<input id="shopPolicySearch" type="search" placeholder="商品名称"></label>
+            </div>
+            <div class="purchase-layout">
+              <div class="table-wrap"><table class="data-table"><thead><tr><th>商品类别</th><th>购买策略</th></tr></thead><tbody id="shopCategoryRules"></tbody></table></div>
+              <div>
+                <div class="preference-controls custom-item-controls"><label>指定商品<input id="customShopItem" maxlength="120"></label><button type="button" id="addShopItemBtn" class="button secondary">添加商品</button></div>
+                <div class="table-wrap shop-policy-list"><table class="data-table"><thead><tr><th>商品</th><th>购买策略</th></tr></thead><tbody id="shopItemRules"></tbody></table></div>
+              </div>
+            </div>
+          </section>
+          <section class="preference-section">
+            <h3>旅程目标与行动</h3>
+            <div class="preference-controls">
+              <label class="check-field"><input type="checkbox" id="turnPlanEnabled">启用目标回合安排</label>
+              <label>默认行为<select id="turnDefault"></select></label>
+              <label>出现讨伐时<select id="subjugationPolicy"></select></label>
+              <label>普通委托<select id="commissionPolicy"></select></label>
+            </div>
+            <div class="preference-controls">
+              <label>批量设置的目标<select id="turnRangeGoal"></select></label>
+              <label>从<input type="number" id="turnRangeFrom" value="1" min="1" max="45"></label>
+              <label>到<input type="number" id="turnRangeTo" value="3" min="1" max="45"></label>
+              <label>批量行为<select id="turnRangeAction"></select></label>
+              <button type="button" class="button secondary" id="applyTurnRangeBtn">应用范围</button>
+            </div>
+            <div id="goalPlanSections"></div>
+          </section>
+        </div>
         <div class="config-grid" id="configGrid"><div class="empty-cell">正在加载…</div></div>
       </section>
     </main>

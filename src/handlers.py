@@ -29,6 +29,8 @@ import numpy as np
 from .event_effects import choose_option, score_options
 from .journey_target import direction_choice, equipment_choice, JourneyTargetPending
 from .controller import SceneTransitionError
+from .automation_preferences import purchase_mode
+from .journey_plan import goal_instruction, menu_choice
 from .commission import TIERS, battle_mode, select_commission, read_panel, read_battle_prompt, normalized_rows, inside, same_commission
 
 
@@ -345,6 +347,7 @@ class HandlerContext:
         # intentionally callback based so handlers stay usable in offline tests.
         self.exploration_prepare = None
         self.exploration_finish = None
+        self.prepare_turn_action = None
 
     def set_turn_detector(self, callback):
         self._turn_detector = callback
@@ -3114,6 +3117,8 @@ class RestHandler(Handler):
             ctx.controller.click_at_percent(rx, ry)
             time.sleep(0.2)
 
+        if getattr(ctx, "prepare_turn_action", None):
+            ctx.prepare_turn_action("rest")
         ctx.controller.click_at_percent(self.CONFIRM_X, self.CONFIRM_Y)
         # 轮询等待休息动画结束 (画面离开休息界面) 或超时 (付费失败)
         from .recognition import ScreenDetector
@@ -3293,6 +3298,69 @@ class MainMenuHandler(Handler):
 # ============================================================
 # CommissionHandler (Priority 3) - 讨伐委托
 # ============================================================
+
+class GoalMenuHandler(Handler):
+    """Route verified menu entries before applying training-specific decisions."""
+
+    @property
+    def priority(self): return 1.75
+
+    @property
+    def name(self): return "目标行动选择"
+
+    @staticmethod
+    def _entries(frame, ocr):
+        height, width = frame.screenshot.shape[:2]
+        rows = normalized_rows(frame.recognize_full(ocr), width, height)
+        labels = {}
+        for row in rows:
+            if inside(row, (.78, .20, .20, .60)) and row["text"] in {"训练", "休息", "委托", "讨伐"}:
+                labels.setdefault(row["text"], []).append(row)
+        if not {"训练", "休息"}.issubset(labels) or any(len(v) != 1 for v in labels.values()):
+            return {}
+        announced = any("受理讨伐" in row["text"] for row in rows)
+        entries = {}
+        for label, candidates in labels.items():
+            kind = {"训练": "train", "休息": "rest", "讨伐": "subjugation", "委托": "commission"}[label]
+            if label == "委托" and announced:
+                kind = "subjugation"
+            entries[kind] = (.941, candidates[0]["y"])
+        return entries
+
+    def can_handle(self, frame, ocr_engine):
+        return frame.screenshot is not None and bool(self._entries(frame, ocr_engine))
+
+    def handle(self, ctx):
+        screenshot = ctx.capture.capture_game()
+        if screenshot is None:
+            return False
+        entries = self._entries(FrameContext(screenshot), ctx.ocr)
+        if not entries:
+            return False
+        instruction = (ctx.activity_instruction() if callable(getattr(ctx, "activity_instruction", None))
+                       else goal_instruction({}, {}))
+        chosen, reason = menu_choice(instruction, entries)
+        if chosen is None:
+            return False
+        if ctx.logger:
+            ctx.logger.begin_decision("journey_activity", list(entries))
+            for kind, position in entries.items():
+                ctx.logger.record_decision_frame(kind, kind, screenshot,
+                                                {"position": position, "instruction": instruction})
+            ctx.logger.log_turn_policy(instruction, "menu", chosen,
+                                      ctx.journey_progress() if callable(getattr(ctx, "journey_progress", None)) else {})
+            if reason == "unavailable_or_forbidden_fallback":
+                ctx.logger.log_fallback("journey_activity", "指定行动不可用或被玩家禁止，选择可用行动",
+                                        instruction, {"action": chosen}, candidates=list(entries))
+        if chosen in {"commission", "subjugation"}:
+            ctx.commission_origin = chosen
+            if callable(getattr(ctx, "journey_progress", None)):
+                ctx.journey_progress()["activity_origin"] = chosen
+        ctx.controller.click_at_percent(*entries[chosen])
+        ctx.controller.wait(.5)
+        ctx.pending_screenshot = ctx.capture.capture_game()
+        return True
+
 
 class AppraisalHandler(Handler):
     """到期评鉴战独立于商店：定位入口 → 准备页接受 → 战斗处理器接管。"""
@@ -3515,6 +3583,7 @@ class CommissionHandler(Handler):
                 return False
             entry = self._commission_trade_entry(screenshot, ctx.ocr)
             if entry is not None:
+                ctx.commission_origin = "subjugation"
                 ctx.controller.click_at_percent(*entry)
                 current, _ = self._wait_panel(ctx)
                 ctx.pending_screenshot = current
@@ -3563,6 +3632,16 @@ class CommissionHandler(Handler):
         screenshot, initial = self._initial_panel(ctx)
         if initial is None:
             return False
+        if callable(getattr(ctx, "activity_instruction", None)):
+            instruction = ctx.activity_instruction()
+            origin = ("subjugation" if initial.get("single_tier_emergency")
+                      else getattr(ctx, "commission_origin", "subjugation"))
+            if instruction.get(origin + "_policy") == "skip":
+                if ctx.logger:
+                    ctx.logger.log_turn_policy(instruction, origin, "skip",
+                                              ctx.journey_progress() if callable(getattr(ctx, "journey_progress", None)) else {})
+                self._exit_commission(ctx)
+                return True
         tiers = (initial["tier"],) if initial.get("single_tier_emergency") else TIERS
         if set(initial["tier_positions"]) != set(tiers):
             raise InputTargetError("未确认完整委托入口，候选证据不完整")
@@ -3636,6 +3715,8 @@ class CommissionHandler(Handler):
                                       reason=reason)
         print(f"[委托] {selected['tier']} 我方RANK{selected['my_rank']} / "
               f"建议RANK{selected['recommended']}，{selected['mode']}")
+        if getattr(ctx, "prepare_turn_action", None):
+            ctx.prepare_turn_action("commission")
         ctx.controller.click_at_percent(*confirmed["accept_positions"][0])
         return self._choose_battle(ctx, selected)
 
@@ -4329,6 +4410,9 @@ class ShopHandler(Handler):
     def _skip_reason(self, info: dict, stamina: float, mood: str,
                      stamina_bar_green: bool) -> str:
         """返回跳过原因"""
+        mode, _ = purchase_mode(self.config.get("shop", {}).get("purchase_rules", {}), info)
+        if mode == "skip":
+            return "用户设置不买"
         type_id = info.get("type", "")
         if type_id == "mood_recovery" and mood == "Best":
             return "心情已是Best, 跳过"
@@ -4718,11 +4802,17 @@ class ShopHandler(Handler):
         ranked = []
         for slot_idx, item_info, text in items:
             type_id = item_info["type"]
+            mode, source = purchase_mode(self.config.get("shop", {}).get("purchase_rules", {}), item_info)
+            item_info["purchase_policy"] = {"mode": mode, "source": source}
+            if mode == "skip":
+                continue
 
-            if not self._can_buy(type_id, item_info, stamina, mood, stamina_bar_green):
+            if mode != "buy" and not self._can_buy(type_id, item_info, stamina, mood, stamina_bar_green):
                 continue
 
             score = self._score_item(type_id, item_info)
+            if mode == "buy":
+                score = max(1, score)
             if score < 0:
                 continue
             ranked.append((slot_idx, item_info, score))

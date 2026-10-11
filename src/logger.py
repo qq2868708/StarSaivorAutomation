@@ -25,7 +25,7 @@ from .runtime_control import RuntimeControl
 
 _SCREENSHOT_ACTION_TYPES = {
     "decision", "train", "rest", "event", "arcanum", "card_select", "shop",
-    "commission", "battle_choice", "fallback",
+    "commission", "battle_choice", "fallback", "turn_policy",
 }
 
 def _json_snapshot(value):
@@ -459,6 +459,12 @@ class RunLogger:
             "chosen": copy.deepcopy(chosen), "candidates": copy.deepcopy(candidates or []),
             "phase": "planned", "evidence": self.decision_evidence(),
         })
+
+    def log_turn_policy(self, instruction, base_action, final_action, progress):
+        self._append_action("turn_policy", {
+            "instruction": copy.deepcopy(instruction), "base_action": base_action,
+            "final_action": final_action, "progress": copy.deepcopy(progress),
+            "evidence": self.decision_evidence()})
 
     def log_card_select(self, card_index: int, reason: str, texts: list[str], *,
                         candidates=None, policy=None, phase="planned", position=None):
