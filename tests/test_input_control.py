@@ -5,9 +5,38 @@ from unittest.mock import Mock, patch
 from src.controller import Controller, InputTargetError, MOUSEEVENTF_LEFTDOWN, MOUSEEVENTF_LEFTUP
 from src.capture import is_window_foreground
 from src.runtime_control import RuntimeInterrupt
+from src.controller import (MOUSEEVENTF_MOVE, MOUSEEVENTF_ABSOLUTE,
+                            MOUSEEVENTF_VIRTUALDESK)
 
 
 class InputControlTests(unittest.TestCase):
+    def test_absolute_input_maps_secondary_and_negative_origin_monitors(self):
+        for desktop, point in [((0, -836, 4920, 1920), (3000, 450)),
+                               ((-1920, 0, 3840, 1080), (-1200, 400))]:
+            left, top, width, height = desktop
+            metrics = {76: left, 77: top, 78: width, 79: height}
+            sent = []
+            def send(_count, pointer, _size):
+                item = pointer._obj.union.mi
+                sent.append((item.dx, item.dy, item.dwFlags))
+                return 1
+            controller = Controller()
+            controller._check_input_target = Mock()
+            with patch("src.controller.user32.GetSystemMetrics", side_effect=metrics.__getitem__), \
+                 patch("src.controller.user32.SendInput", side_effect=send):
+                controller._send_mouse_input(*point, MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE)
+            self.assertEqual(sent, [(round((point[0] - left) * 65535 / (width - 1)),
+                                     round((point[1] - top) * 65535 / (height - 1)),
+                                     MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK)])
+
+    def test_button_only_input_does_not_add_desktop_movement(self):
+        controller = Controller()
+        controller._check_input_target = Mock()
+        with patch("src.controller.user32.SendInput", return_value=1) as send:
+            controller._send_mouse_event(MOUSEEVENTF_LEFTDOWN)
+        item = send.call_args.args[1]._obj.union.mi
+        self.assertEqual((item.dx, item.dy, item.dwFlags), (0, 0, MOUSEEVENTF_LEFTDOWN))
+
     @patch("src.capture.user32.IsWindow", return_value=True)
     @patch("src.capture.user32.GetWindowThreadProcessId")
     @patch("src.capture.user32.GetAncestor", return_value=0)

@@ -24,9 +24,14 @@ MOUSEEVENTF_LEFTDOWN = 0x0002
 MOUSEEVENTF_LEFTUP = 0x0004
 MOUSEEVENTF_WHEEL = 0x0800
 MOUSEEVENTF_ABSOLUTE = 0x8000
+MOUSEEVENTF_VIRTUALDESK = 0x4000
 KEYEVENTF_KEYUP = 0x0002
 SM_CXSCREEN = 0
 SM_CYSCREEN = 1
+SM_XVIRTUALSCREEN = 76
+SM_YVIRTUALSCREEN = 77
+SM_CXVIRTUALSCREEN = 78
+SM_CYVIRTUALSCREEN = 79
 VK_ESCAPE = 0x1B
 VK_SPACE = 0x20
 VK_1 = 0x31
@@ -362,12 +367,20 @@ class Controller:
 
     def _send_mouse_input(self, dx, dy, flags, check_target=True):
         """SendInput 底层调用 (鼠标)"""
-        screen_w = user32.GetSystemMetrics(SM_CXSCREEN)
-        screen_h = user32.GetSystemMetrics(SM_CYSCREEN)
-
-        # 绝对坐标: dx/dy 范围是 0-65535 (映射到整个屏幕)
-        normalized_x = int((dx * 65535) / screen_w) if screen_w > 0 else 0
-        normalized_y = int((dy * 65535) / screen_h) if screen_h > 0 else 0
+        normalized_x, normalized_y = dx, dy
+        if flags & MOUSEEVENTF_ABSOLUTE:
+            left = user32.GetSystemMetrics(SM_XVIRTUALSCREEN)
+            top = user32.GetSystemMetrics(SM_YVIRTUALSCREEN)
+            width = user32.GetSystemMetrics(SM_CXVIRTUALSCREEN)
+            height = user32.GetSystemMetrics(SM_CYVIRTUALSCREEN)
+            if width <= 1 or height <= 1:
+                raise InputTargetError("无法读取虚拟桌面范围，停止发送鼠标输入")
+            # ClientToScreen/GetCursorPos use desktop coordinates, including
+            # secondary monitors and negative origins. Map the same desktop on
+            # movement and restoration rather than clamping to the primary.
+            normalized_x = max(0, min(65535, round((dx - left) * 65535 / (width - 1))))
+            normalized_y = max(0, min(65535, round((dy - top) * 65535 / (height - 1))))
+            flags |= MOUSEEVENTF_VIRTUALDESK
 
         inp = INPUT()
         inp.type = INPUT_MOUSE
